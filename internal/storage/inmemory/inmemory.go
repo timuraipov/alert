@@ -3,7 +3,7 @@ package inmemory
 import (
 	"fmt"
 
-	"github.com/timuraipov/alert/internal/http-server/handlers/metrics"
+	"github.com/timuraipov/alert/internal/handlers/metrics"
 )
 
 type InMemory struct {
