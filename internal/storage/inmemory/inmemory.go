@@ -3,7 +3,7 @@ package inmemory
 import (
 	"fmt"
 
-	. "github.com/timuraipov/alert/internal/domain/metric"
+	"github.com/timuraipov/alert/internal/domain/metric"
 )
 
 type InMemory struct {
@@ -11,12 +11,12 @@ type InMemory struct {
 	DBCounter map[string]int64
 }
 
-func (i *InMemory) Save(metric Metric) error {
-	switch metric.Type {
-	case MetricTypeCounter:
-		i.DBCounter[metric.Name] += metric.ValueCounter
-	case MetricTypeGauge:
-		i.DBGauge[metric.Name] = metric.ValueGauge
+func (i *InMemory) Save(metricObj metric.Metric) error {
+	switch metricObj.Type {
+	case metric.MetricTypeCounter:
+		i.DBCounter[metricObj.Name] += metricObj.ValueCounter
+	case metric.MetricTypeGauge:
+		i.DBGauge[metricObj.Name] = metricObj.ValueGauge
 	default:
 		return fmt.Errorf("incorrect type or value")
 	}

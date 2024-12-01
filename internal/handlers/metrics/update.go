@@ -7,11 +7,11 @@ import (
 	"strconv"
 	"strings"
 
-	. "github.com/timuraipov/alert/internal/domain/metric"
+	"github.com/timuraipov/alert/internal/domain/metric"
 )
 
 type MetricSaver interface {
-	Save(metric Metric) error
+	Save(metric metric.Metric) error
 }
 
 var (
@@ -64,36 +64,36 @@ func New(saver MetricSaver) http.HandlerFunc {
 // 	}
 
 // }
-func parseAndValidate(splittedPath []string) (*Metric, error) {
+func parseAndValidate(splittedPath []string) (*metric.Metric, error) {
 	if len(splittedPath) != 4 {
 		fmt.Println("len mismatch")
 		return nil, ErrMetricNameRequired
 	}
 	metricType := splittedPath[1]
-	if !(metricType == MetricTypeCounter || metricType == MetricTypeGauge) {
+	if !(metricType == metric.MetricTypeCounter || metricType == metric.MetricTypeGauge) {
 		fmt.Println("type mismatch")
 
 		return nil, ErrMetricTypeIsEnum
 	}
-	metric := &Metric{
+	metricObj := &metric.Metric{
 		Type: metricType,
 	}
-	if metricType == MetricTypeCounter {
+	if metricType == metric.MetricTypeCounter {
 
 		value, err := strconv.ParseInt(splittedPath[3], 10, 64)
 		if err != nil {
 			return nil, ErrMetricTypeIsEnum
 		}
-		metric.ValueCounter = value
+		metricObj.ValueCounter = value
 	}
-	if metricType == MetricTypeGauge {
+	if metricType == metric.MetricTypeGauge {
 
 		value, err := strconv.ParseFloat(splittedPath[3], 64)
 		if err != nil {
 			return nil, ErrMetricTypeIsEnum
 		}
-		metric.ValueGauge = value
+		metricObj.ValueGauge = value
 	}
-	metric.Name = splittedPath[2]
-	return metric, nil
+	metricObj.Name = splittedPath[2]
+	return metricObj, nil
 }

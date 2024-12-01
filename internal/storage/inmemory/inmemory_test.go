@@ -4,23 +4,23 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/timuraipov/alert/internal/handlers/metrics"
+	"github.com/timuraipov/alert/internal/domain/metric"
 )
 
 func TestSaveGauge(t *testing.T) {
 	tests := []struct {
 		name       string
 		err        error
-		metrics    []metrics.Metric
+		metrics    []metric.Metric
 		want       float64
 		metricType string
 	}{
 		{
 			name: "positive Gauge",
 			err:  nil,
-			metrics: []metrics.Metric{
+			metrics: []metric.Metric{
 				{
-					Type:       metrics.MetricTypeGauge,
+					Type:       metric.MetricTypeGauge,
 					Name:       "someName",
 					ValueGauge: 1.009,
 				},
@@ -30,14 +30,14 @@ func TestSaveGauge(t *testing.T) {
 		{
 			name: "positive Counter",
 			err:  nil,
-			metrics: []metrics.Metric{
+			metrics: []metric.Metric{
 				{
-					Type:       metrics.MetricTypeGauge,
+					Type:       metric.MetricTypeGauge,
 					Name:       "someName",
 					ValueGauge: 1.009,
 				},
 				{
-					Type:       metrics.MetricTypeGauge,
+					Type:       metric.MetricTypeGauge,
 					Name:       "someName",
 					ValueGauge: 12.009,
 				},
@@ -64,16 +64,16 @@ func TestSaveCounter(t *testing.T) {
 	tests := []struct {
 		name       string
 		err        error
-		metrics    []metrics.Metric
+		metrics    []metric.Metric
 		want       int64
 		metricType string
 	}{
 		{
 			name: "positive Counter 1 value",
 			err:  nil,
-			metrics: []metrics.Metric{
+			metrics: []metric.Metric{
 				{
-					Type:         metrics.MetricTypeCounter,
+					Type:         metric.MetricTypeCounter,
 					Name:         "someName",
 					ValueCounter: 50,
 				},
@@ -83,19 +83,19 @@ func TestSaveCounter(t *testing.T) {
 		{
 			name: "positive Counter multi value",
 			err:  nil,
-			metrics: []metrics.Metric{
+			metrics: []metric.Metric{
 				{
-					Type:         metrics.MetricTypeCounter,
+					Type:         metric.MetricTypeCounter,
 					Name:         "someName",
 					ValueCounter: 1,
 				},
 				{
-					Type:         metrics.MetricTypeCounter,
+					Type:         metric.MetricTypeCounter,
 					Name:         "someName",
 					ValueCounter: 2,
 				},
 				{
-					Type:         metrics.MetricTypeCounter,
+					Type:         metric.MetricTypeCounter,
 					Name:         "someName",
 					ValueCounter: 1000,
 				},
