@@ -6,28 +6,18 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+
+	. "github.com/timuraipov/alert/internal/domain/metric"
 )
 
 type MetricSaver interface {
 	Save(metric Metric) error
 }
 
-const (
-	MetricTypeGauge   = "gauge"
-	MetricTypeCounter = "counter"
-)
-
 var (
 	ErrMetricNameRequired = errors.New("metric name is required")
 	ErrMetricTypeIsEnum   = errors.New("metric type should be gauge or counter")
 )
-
-type Metric struct {
-	Type         string
-	Name         string
-	ValueCounter int64
-	ValueGauge   float64
-}
 
 func New(saver MetricSaver) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -89,7 +79,6 @@ func parseAndValidate(splittedPath []string) (*Metric, error) {
 		Type: metricType,
 	}
 	if metricType == MetricTypeCounter {
-		fmt.Println("counter mismatch")
 
 		value, err := strconv.ParseInt(splittedPath[3], 10, 64)
 		if err != nil {
@@ -98,7 +87,6 @@ func parseAndValidate(splittedPath []string) (*Metric, error) {
 		metric.ValueCounter = value
 	}
 	if metricType == MetricTypeGauge {
-		fmt.Println("Gaugage mismatch")
 
 		value, err := strconv.ParseFloat(splittedPath[3], 64)
 		if err != nil {
