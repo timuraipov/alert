@@ -10,7 +10,7 @@ import (
 )
 
 func TestUpdate(t *testing.T) {
-	var host string = "http://localhost:8080"
+	host := "http://localhost:8080"
 	testCases := []struct {
 		name         string
 		path         string
