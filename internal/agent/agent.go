@@ -68,10 +68,11 @@ func (m *MetricsCollector) Send(url string) {
 		}
 		client := &http.Client{}
 		res, err := client.Do(req)
-		defer res.Body.Close()
 		if err != nil {
 			panic(err)
 		}
+		defer res.Body.Close()
+
 		fmt.Println("statusCode", res.StatusCode)
 	}
 }
