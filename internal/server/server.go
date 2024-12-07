@@ -3,16 +3,25 @@ package server
 import (
 	"net/http"
 
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/timuraipov/alert/internal/handlers/metrics"
 	"github.com/timuraipov/alert/internal/storage/inmemory"
 )
 
 func Run() error {
-	saver, err := inmemory.New()
-	if err != nil {
-		panic(err)
+	storage, _ := inmemory.New()
+	metricsHandler := metrics.MetricHandler{
+		Storage: storage,
 	}
-	mux := http.NewServeMux()
-	mux.HandleFunc("/update/", metrics.New(saver))
-	return http.ListenAndServe(":8080", mux)
+	r := MetricsRouter(metricsHandler)
+	return http.ListenAndServe(":8080", r)
+}
+func MetricsRouter(handler metrics.MetricHandler) chi.Router {
+	r := chi.NewRouter()
+	r.Use(middleware.Logger)
+	r.Post("/update/{type}/{name}/{val}", handler.Update)
+	r.Get("/value/{type}/{name}", handler.GetByName)
+	r.Get("/", handler.GetAll)
+	return r
 }

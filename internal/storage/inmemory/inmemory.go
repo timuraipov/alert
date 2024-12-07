@@ -22,7 +22,27 @@ func (i *InMemory) Save(metricObj metric.Metric) error {
 	}
 	return nil
 }
-
+func (i *InMemory) GetAll() map[string]interface{} {
+	metrics := make(map[string]interface{})
+	for key, val := range i.DBGauge {
+		metrics[key] = val
+	}
+	for key, val := range i.DBCounter {
+		metrics[key] = val
+	}
+	return metrics
+}
+func (i *InMemory) GetByTypeAndName(metricType, metricName string) (interface{}, bool) {
+	if metricType == metric.MetricTypeCounter {
+		val, ok := i.DBCounter[metricName]
+		return val, ok
+	}
+	if metricType == metric.MetricTypeGauge {
+		val, ok := i.DBGauge[metricName]
+		return val, ok
+	}
+	return nil, false
+}
 func New() (*InMemory, error) {
 	dbGauge := make(map[string]float64)
 	dbCounter := make(map[string]int64)
