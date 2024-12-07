@@ -14,7 +14,6 @@ import (
 )
 
 func TestUpdate(t *testing.T) {
-	host := "http://localhost:8080"
 	testCases := []struct {
 		name         string
 		path         string
@@ -72,15 +71,16 @@ func TestUpdate(t *testing.T) {
 		Storage: storage,
 	}
 	ts := httptest.NewServer(MetricsRouter(metricsHandler))
+	defer ts.Close()
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
-			resp, _ := testRequest(t, ts, tt.method, host+tt.path)
+			resp, _ := testRequest(t, ts, tt.method, tt.path)
 			assert.Equal(t, tt.expectedCode, resp.StatusCode)
 		})
 	}
 }
 func testRequest(t *testing.T, ts *httptest.Server, method, path string) (*http.Response, string) {
-	req, err := http.NewRequest(method, path, nil)
+	req, err := http.NewRequest(method, ts.URL+path, nil)
 	require.NoError(t, err)
 	resp, err := ts.Client().Do(req)
 	require.NoError(t, err)
@@ -90,7 +90,6 @@ func testRequest(t *testing.T, ts *httptest.Server, method, path string) (*http.
 	return resp, string(respBody)
 }
 func TestAll(t *testing.T) {
-	host := "http://localhost:8080"
 	testCases := []struct {
 		name         string
 		path         string
@@ -103,7 +102,9 @@ func TestAll(t *testing.T) {
 			path:         "",
 			method:       http.MethodGet,
 			expectedCode: http.StatusOK,
-			expectedBody: ``},
+			expectedBody: `Alloc = 100.23
+PollCount = 100
+`},
 	}
 	storage, err := inmemory.New()
 	if err != nil {
@@ -113,33 +114,39 @@ func TestAll(t *testing.T) {
 		Storage: storage,
 	}
 	ts := httptest.NewServer(MetricsRouter(metricsHandler))
+	defer ts.Close()
+	storage.DBCounter["PollCount"] = 100
+	storage.DBGauge["Alloc"] = 100.23
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
-			resp, body := testRequest(t, ts, tt.method, host+tt.path)
+			resp, body := testRequest(t, ts, tt.method, tt.path)
 			assert.Equal(t, tt.expectedCode, resp.StatusCode)
 			assert.NotEmpty(t, body)
+			assert.Equal(t, tt.expectedBody, body)
 		})
 	}
 }
 func TestGetByTypeAndName(t *testing.T) {
-	host := "http://localhost:8080"
 	testCases := []struct {
 		name         string
 		path         string
 		method       string
 		expectedCode int
+		expectedBody string
 	}{
 		{
 			name:         "positive get Alloc",
 			path:         "/value/gauge/Alloc",
 			method:       http.MethodGet,
 			expectedCode: http.StatusOK,
+			expectedBody: "value=100.23",
 		},
 		{
 			name:         "positive get PollCount",
 			path:         "/value/counter/PollCount",
 			method:       http.MethodGet,
 			expectedCode: http.StatusOK,
+			expectedBody: "value=100",
 		},
 	}
 	storage, err := inmemory.New()
@@ -150,11 +157,15 @@ func TestGetByTypeAndName(t *testing.T) {
 		Storage: storage,
 	}
 	ts := httptest.NewServer(MetricsRouter(metricsHandler))
+	defer ts.Close()
+	storage.DBCounter["PollCount"] = 100
+	storage.DBGauge["Alloc"] = 100.23
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
-			fmt.Println("host", host+tt.path)
-			resp, _ := testRequest(t, ts, tt.method, host+tt.path)
+			fmt.Println("host", tt.path)
+			resp, body := testRequest(t, ts, tt.method, tt.path)
 			assert.Equal(t, tt.expectedCode, resp.StatusCode)
+			assert.Equal(t, tt.expectedBody, body)
 		})
 	}
 }
