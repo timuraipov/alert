@@ -1,11 +1,17 @@
 package main
 
 import (
+	"net/http"
+
 	"github.com/timuraipov/alert/internal/server"
 )
 
 func main() {
-	if err := server.Run(); err != nil {
+	parseFlags()
+
+	server := server.New()
+	err := http.ListenAndServe(flagRunAddr, server)
+	if err != nil {
 		panic(err)
 	}
 }
