@@ -49,11 +49,8 @@ func (mh *MetricHandler) Update(w http.ResponseWriter, r *http.Request) {
 	metricType := chi.URLParam(r, "type")
 	metricName := chi.URLParam(r, "name")
 	metricValue := chi.URLParam(r, "val")
-	fmt.Println("type, name, val", metricType, metricName, metricValue)
-	fmt.Println("host", r.Host, "path", r.URL.Path)
 	metric, err := parseAndValidate(metricType, metricName, metricValue)
 	if err != nil {
-		fmt.Print("not validated")
 		if errors.Is(err, ErrMetricNameRequired) {
 			w.WriteHeader(http.StatusNotFound)
 			return
@@ -68,25 +65,6 @@ func (mh *MetricHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// func Update(w http.ResponseWriter, r *http.Request) {
-// 	if r.Method != http.MethodPost {
-// 		w.WriteHeader(http.StatusForbidden)
-// 		return
-// 	}
-// 	fmt.Println("host", r.Host, "path", r.URL.Path)
-// 	path := r.URL.Path
-// 	splittedPath := strings.Split(path[1:], "/")
-// 	err := validate(splittedPath)
-// 	if err != nil {
-// 		if errors.Is(err, ErrMetricNameRequired) {
-// 			w.WriteHeader(http.StatusNotFound)
-// 			return
-// 		}
-// 		w.WriteHeader(http.StatusBadRequest)
-// 		return
-// 	}
-
-// }
 func parseAndValidate(metricType, metricName string, value string) (*metric.Metric, error) {
 
 	if !(metricType == metric.MetricTypeCounter || metricType == metric.MetricTypeGauge) {
