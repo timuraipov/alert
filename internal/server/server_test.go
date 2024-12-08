@@ -141,14 +141,14 @@ func TestGetByTypeAndName(t *testing.T) {
 			path:         "/value/gauge/Alloc",
 			method:       http.MethodGet,
 			expectedCode: http.StatusOK,
-			expectedBody: "value=100.23",
+			expectedBody: "100.23",
 		},
 		{
 			name:         "positive get PollCount",
 			path:         "/value/counter/PollCount",
 			method:       http.MethodGet,
 			expectedCode: http.StatusOK,
-			expectedBody: "value=100",
+			expectedBody: "100",
 		},
 	}
 	storage, err := inmemory.New()
