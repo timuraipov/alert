@@ -75,6 +75,7 @@ func TestUpdate(t *testing.T) {
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
 			resp, _ := testRequest(t, ts, tt.method, tt.path)
+			defer resp.Body.Close()
 			assert.Equal(t, tt.expectedCode, resp.StatusCode)
 		})
 	}
@@ -120,6 +121,7 @@ PollCount = 100
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
 			resp, body := testRequest(t, ts, tt.method, tt.path)
+			defer resp.Body.Close()
 			assert.Equal(t, tt.expectedCode, resp.StatusCode)
 			assert.NotEmpty(t, body)
 			assert.Equal(t, tt.expectedBody, body)
@@ -164,6 +166,7 @@ func TestGetByTypeAndName(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			fmt.Println("host", tt.path)
 			resp, body := testRequest(t, ts, tt.method, tt.path)
+			defer resp.Body.Close()
 			assert.Equal(t, tt.expectedCode, resp.StatusCode)
 			assert.Equal(t, tt.expectedBody, body)
 		})

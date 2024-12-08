@@ -40,7 +40,7 @@ func (mh *MetricHandler) GetByName(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 	} else {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(fmt.Sprintf("value=%v", val)))
+		w.Write([]byte(fmt.Sprintf("%v", val)))
 	}
 
 }
