@@ -1,21 +1,19 @@
 package server
 
 import (
-	"net/http"
-
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/timuraipov/alert/internal/handlers/metrics"
 	"github.com/timuraipov/alert/internal/storage/inmemory"
 )
 
-func Run() error {
+func New() chi.Router {
 	storage, _ := inmemory.New()
 	metricsHandler := metrics.MetricHandler{
 		Storage: storage,
 	}
 	r := MetricsRouter(metricsHandler)
-	return http.ListenAndServe(":8080", r)
+	return r
 }
 func MetricsRouter(handler metrics.MetricHandler) chi.Router {
 	r := chi.NewRouter()

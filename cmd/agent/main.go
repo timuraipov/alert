@@ -7,7 +7,8 @@ import (
 var PollCount int64
 
 func main() {
-	agent := agent.New()
+	parseFlags()
+	agent := agent.New(flagRunAddr, reportInterval, pollInterval)
 	agent.Run()
 }
 

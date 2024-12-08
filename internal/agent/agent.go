@@ -11,15 +11,21 @@ import (
 )
 
 type MetricsCollector struct {
-	mx           sync.Mutex
-	GaugeMetrics map[string]interface{}
-	PollCount    int64
+	mx                  sync.Mutex
+	GaugeMetrics        map[string]interface{}
+	PollInterval        int64
+	ReportCountInterval int64
+	Addr                string
+	PollCount           int64
 }
 
-func New() *MetricsCollector {
+func New(flagRunAddr string, reportInterval, pollInterval int64) *MetricsCollector {
 	return &MetricsCollector{
-		GaugeMetrics: map[string]interface{}{},
-		PollCount:    0,
+		GaugeMetrics:        map[string]interface{}{},
+		PollInterval:        pollInterval,
+		ReportCountInterval: reportInterval,
+		Addr:                flagRunAddr,
+		PollCount:           0,
 	}
 }
 func (m *MetricsCollector) UpdateMetrics() {
@@ -77,7 +83,7 @@ func (m *MetricsCollector) Send(url string) {
 	}
 }
 func (m *MetricsCollector) Run() {
-	tickerUpdateMetrics := time.NewTicker(2 * time.Second)
+	tickerUpdateMetrics := time.NewTicker(time.Duration(m.PollInterval) * time.Second)
 	quitUpdateMetrics := make(chan struct{})
 	go func() {
 		for {
@@ -90,10 +96,10 @@ func (m *MetricsCollector) Run() {
 			}
 		}
 	}()
-	time.Sleep(2 * time.Second)
+	time.Sleep(time.Duration(m.PollInterval) * time.Second)
 	for {
-		m.Send("http://localhost:8080")
-		time.Sleep(10 * time.Second)
+		m.Send("http://localhost" + m.Addr)
+		time.Sleep(time.Duration(m.ReportCountInterval) * time.Second)
 	}
 
 }
