@@ -98,7 +98,7 @@ func (m *MetricsCollector) Run() {
 	}()
 	time.Sleep(time.Duration(m.PollInterval) * time.Second)
 	for {
-		m.Send("http://localhost" + m.Addr)
+		m.Send(m.Addr)
 		time.Sleep(time.Duration(m.ReportCountInterval) * time.Second)
 	}
 
