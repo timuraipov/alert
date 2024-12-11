@@ -76,7 +76,6 @@ func parseAndValidate(metricType, metricName string, value string) (*metric.Metr
 		Type: metricType,
 	}
 	if metricType == metric.MetricTypeCounter {
-		fmt.Println()
 		val, err := strconv.ParseInt(value, 10, 64)
 		if err != nil {
 			fmt.Println("int64 mismatch", "-", value, "-")

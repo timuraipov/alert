@@ -65,9 +65,7 @@ func (m *MetricsCollector) UpdateMetrics() {
 }
 func (m *MetricsCollector) Send(url string) {
 	for key, val := range m.GaugeMetrics {
-		fmt.Println(key, val)
 		fullPath := url + "/update/gauge/" + key + "/" + fmt.Sprintf("%v", val)
-		fmt.Println(fullPath)
 		req, err := http.NewRequest(http.MethodPost, fullPath, nil)
 		if err != nil {
 			log.Fatal(err)
@@ -79,7 +77,6 @@ func (m *MetricsCollector) Send(url string) {
 		}
 		defer res.Body.Close()
 
-		fmt.Println("statusCode", res.StatusCode)
 	}
 }
 func (m *MetricsCollector) Run() {
