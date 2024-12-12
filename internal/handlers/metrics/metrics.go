@@ -72,19 +72,21 @@ func parseAndValidate(metricType, metricName string, value string) (*metric.Metr
 
 		return nil, ErrMetricTypeIsEnum
 	}
+	if metricType == "" {
+		return nil, ErrMetricNameRequired
+	}
 	metricObj := &metric.Metric{
 		Type: metricType,
 	}
-	if metricType == metric.MetricTypeCounter {
+	switch metricType {
+	case metric.MetricTypeCounter:
 		val, err := strconv.ParseInt(value, 10, 64)
 		if err != nil {
 			fmt.Println("int64 mismatch", "-", value, "-")
 			return nil, ErrMetricTypeIsEnum
 		}
 		metricObj.ValueCounter = val
-	}
-	if metricType == metric.MetricTypeGauge {
-
+	case metric.MetricTypeGauge:
 		val, err := strconv.ParseFloat(value, 64)
 		if err != nil {
 			fmt.Printf("float64 mismatch")
@@ -92,6 +94,7 @@ func parseAndValidate(metricType, metricName string, value string) (*metric.Metr
 		}
 		metricObj.ValueGauge = val
 	}
+
 	metricObj.Name = metricName
 	return metricObj, nil
 }

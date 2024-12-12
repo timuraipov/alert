@@ -2,16 +2,20 @@ package inmemory
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/timuraipov/alert/internal/domain/metric"
 )
 
 type InMemory struct {
+	mx        sync.Mutex
 	DBGauge   map[string]float64
 	DBCounter map[string]int64
 }
 
 func (i *InMemory) Save(metricObj metric.Metric) error {
+	i.mx.Lock()
+	defer i.mx.Unlock()
 	switch metricObj.Type {
 	case metric.MetricTypeCounter:
 		i.DBCounter[metricObj.Name] += metricObj.ValueCounter

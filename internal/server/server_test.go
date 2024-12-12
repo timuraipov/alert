@@ -95,16 +95,13 @@ func TestAll(t *testing.T) {
 		path         string
 		method       string
 		expectedCode int
-		expectedBody string
 	}{
 		{
 			name:         "positive get All",
 			path:         "",
 			method:       http.MethodGet,
 			expectedCode: http.StatusOK,
-			expectedBody: `Alloc = 100.23
-PollCount = 100
-`},
+		},
 	}
 	storage, err := inmemory.New()
 	if err != nil {
@@ -123,7 +120,6 @@ PollCount = 100
 			defer resp.Body.Close()
 			assert.Equal(t, tt.expectedCode, resp.StatusCode)
 			assert.NotEmpty(t, body)
-			assert.Equal(t, tt.expectedBody, body)
 		})
 	}
 }

@@ -12,16 +12,13 @@ type Config struct {
 	PollInterval   int64  `env:"POLL_INTERVAL"`
 }
 
-func MustLoad() *Config {
+func MustLoad() (*Config, error) {
 	cfg := &Config{}
 	flag.StringVar(&cfg.ServerAddr, "a", "localhost:8080", "address and port to request server")
 	flag.Int64Var(&cfg.ReportInterval, "r", 10, "reportInterval period")
 	flag.Int64Var(&cfg.PollInterval, "p", 2, "pollInterval period")
 	flag.Parse()
 	err := env.Parse(cfg)
-	if err != nil {
-		panic(err)
-	}
 
-	return cfg
+	return cfg, err
 }
