@@ -11,7 +11,7 @@ import (
 )
 
 type MetricsCollector struct {
-	mx                  sync.Mutex
+	mx                  sync.RWMutex
 	GaugeMetrics        map[string]interface{}
 	PollInterval        int64
 	ReportCountInterval int64
@@ -29,13 +29,11 @@ func New(flagRunAddr string, reportInterval, pollInterval int64) *MetricsCollect
 	}
 }
 func (m *MetricsCollector) UpdateMetrics() {
-	m.mx.Lock()
-	m.PollCount++
-	m.mx.Unlock()
 	var memStat runtime.MemStats
 	runtime.ReadMemStats(&memStat)
 	m.mx.Lock()
 	defer m.mx.Unlock()
+	m.PollCount++
 	m.GaugeMetrics["Alloc"] = memStat.Alloc
 	m.GaugeMetrics["BuckHashSys"] = memStat.BuckHashSys
 	m.GaugeMetrics["Frees"] = memStat.Frees
@@ -65,24 +63,37 @@ func (m *MetricsCollector) UpdateMetrics() {
 	m.GaugeMetrics["TotalAlloc"] = memStat.TotalAlloc
 	m.GaugeMetrics["RandomValue"] = rand.Float64()
 }
-func (m *MetricsCollector) Send(url string) {
-	m.mx.Lock()
-	defer m.mx.Unlock()
+func (m *MetricsCollector) Send(url string) error {
+	m.mx.RLock()
+	defer m.mx.RUnlock()
 	for key, val := range m.GaugeMetrics {
-		fullPath := url + "/update/gauge/" + key + "/" + fmt.Sprintf("%v", val)
-		req, err := http.NewRequest(http.MethodPost, fullPath, nil)
+		err := m.sendMetric(url, "gauge", key, val)
 		if err != nil {
-			log.Print(err)
-		}
-		client := &http.Client{}
-		res, err := client.Do(req)
-		if err != nil {
-			log.Print(err)
-		} else {
-			res.Body.Close()
+			return err
 		}
 	}
-
+	//send PollCount
+	err := m.sendMetric(url, "counter", "PollCount", m.PollCount)
+	if err != nil {
+		return err
+	}
+	m.PollCount = 0
+	return nil
+}
+func (m *MetricsCollector) sendMetric(url, metricType, metricName string, metricValue interface{}) error {
+	fullPath := url + "/update/" + metricType + "/" + metricName + "/" + fmt.Sprintf("%v", metricValue)
+	req, err := http.NewRequest(http.MethodPost, fullPath, nil)
+	if err != nil {
+		return err
+	}
+	client := &http.Client{}
+	res, err := client.Do(req)
+	if err != nil {
+		return err
+	} else {
+		res.Body.Close()
+	}
+	return nil
 }
 func (m *MetricsCollector) Run() {
 	tickerUpdateMetrics := time.NewTicker(time.Duration(m.PollInterval) * time.Second)
@@ -100,7 +111,10 @@ func (m *MetricsCollector) Run() {
 	}()
 	time.Sleep(time.Duration(m.ReportCountInterval) * time.Second)
 	for {
-		m.Send("http://" + m.Addr)
+		err := m.Send("http://" + m.Addr)
+		if err != nil {
+			log.Print(err)
+		}
 		time.Sleep(time.Duration(m.ReportCountInterval) * time.Second)
 	}
 

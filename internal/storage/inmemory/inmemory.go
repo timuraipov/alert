@@ -8,7 +8,7 @@ import (
 )
 
 type InMemory struct {
-	mx        sync.Mutex
+	mx        sync.RWMutex
 	DBGauge   map[string]float64
 	DBCounter map[string]int64
 }
@@ -27,6 +27,8 @@ func (i *InMemory) Save(metricObj metric.Metric) error {
 	return nil
 }
 func (i *InMemory) GetAll() map[string]interface{} {
+	i.mx.RLock()
+	defer i.mx.RUnlock()
 	metrics := make(map[string]interface{})
 	for key, val := range i.DBGauge {
 		metrics[key] = val
@@ -37,6 +39,8 @@ func (i *InMemory) GetAll() map[string]interface{} {
 	return metrics
 }
 func (i *InMemory) GetByTypeAndName(metricType, metricName string) (interface{}, bool) {
+	i.mx.RLock()
+	defer i.mx.RUnlock()
 	if metricType == metric.MetricTypeCounter {
 		val, ok := i.DBCounter[metricName]
 		return val, ok
