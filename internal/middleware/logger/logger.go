@@ -1,11 +1,23 @@
 package logger
 
 import (
+	"fmt"
 	"net/http"
 	"time"
+
+	"github.com/timuraipov/alert/internal/logger"
 )
 
 type (
+	requestLog struct {
+		URI      string
+		method   string
+		duration time.Duration
+	}
+	responseLog struct {
+		status int
+		size   int
+	}
 	// берём структуру для хранения сведений об ответе
 	responseData struct {
 		status int
@@ -47,12 +59,9 @@ func WithLogging(h http.Handler) http.Handler {
 
 		duration := time.Since(start)
 
-		sugar.Infoln(
-			"uri", r.RequestURI,
-			"method", r.Method,
-			"status", responseData.status, // получаем перехваченный код статуса ответа
-			"duration", duration,
-			"size", responseData.size, // получаем перехваченный размер ответа
+		logger.Log.Sugar().Info(
+			"request", fmt.Sprintf(`{"URI":%v,"method":"%v","duration":%v}`, r.RequestURI, r.Method, duration),
+			"response", fmt.Sprintf(`{"status":%v,"size":%v}`, responseData.status, responseData.size),
 		)
 	}
 	return http.HandlerFunc(logFn)

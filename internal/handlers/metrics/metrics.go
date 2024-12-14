@@ -63,6 +63,7 @@ func (mh *MetricHandler) Update(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
+	w.WriteHeader(http.StatusOK)
 }
 
 func parseAndValidate(metricType, metricName string, value string) (*metric.Metric, error) {
