@@ -1,13 +1,21 @@
 package agent
 
 import (
+	"bytes"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
+	"math"
 	"math/rand/v2"
 	"net/http"
 	"runtime"
 	"sync"
 	"time"
+
+	"github.com/timuraipov/alert/internal/domain/metric"
+	"github.com/timuraipov/alert/internal/logger"
+	"go.uber.org/zap"
 )
 
 type MetricsCollector struct {
@@ -64,30 +72,52 @@ func (m *MetricsCollector) UpdateMetrics() {
 	m.GaugeMetrics["RandomValue"] = rand.Float64()
 }
 func (m *MetricsCollector) Send(url string) error {
+	op := "agent.Send"
 	m.mx.RLock()
 	defer m.mx.RUnlock()
 	for key, val := range m.GaugeMetrics {
-		err := m.sendMetric(url, "gauge", key, val)
+		typedValue, err := convertToFloat64(val)
 		if err != nil {
+			logger.Log.Debug("failed to Convert GaugeMetrics value",
+				zap.String("operation", op),
+				zap.String("value", fmt.Sprintf("%v", val)),
+			)
+		}
+
+		metric := metric.Metrics{
+			ID:    key,
+			MType: metric.MetricTypeGauge,
+			Value: &typedValue,
+		}
+		err = m.sendMetric(url, metric)
+		if err != nil {
+			logger.Log.Error("failed to  send metrics",
+				zap.String("operation", op),
+				zap.Error(err),
+			)
 			return err
 		}
 	}
 	//send PollCount
-	err := m.sendMetric(url, "counter", "PollCount", m.PollCount)
+
+	metric := metric.Metrics{
+		ID:    "PollCount",
+		MType: metric.MetricTypeCounter,
+		Delta: &m.PollCount,
+	}
+	err := m.sendMetric(url, metric)
 	if err != nil {
 		return err
 	}
 	m.PollCount = 0
 	return nil
 }
-func (m *MetricsCollector) sendMetric(url, metricType, metricName string, metricValue interface{}) error {
-	fullPath := url + "/update/" + metricType + "/" + metricName + "/" + fmt.Sprintf("%v", metricValue)
-	req, err := http.NewRequest(http.MethodPost, fullPath, nil)
+func (m *MetricsCollector) sendMetric(url string, metricObj metric.Metrics) error {
+	requestBody, err := json.Marshal(metricObj)
 	if err != nil {
-		return err
+		log.Print(err)
 	}
-	client := &http.Client{}
-	res, err := client.Do(req)
+	res, err := http.Post(url, `application/json`, bytes.NewReader(requestBody))
 	if err != nil {
 		return err
 	} else {
@@ -96,6 +126,7 @@ func (m *MetricsCollector) sendMetric(url, metricType, metricName string, metric
 	return nil
 }
 func (m *MetricsCollector) Run() {
+	op := "agent.Run"
 	tickerUpdateMetrics := time.NewTicker(time.Duration(m.PollInterval) * time.Second)
 	quitUpdateMetrics := make(chan struct{})
 	go func() {
@@ -111,11 +142,33 @@ func (m *MetricsCollector) Run() {
 	}()
 	time.Sleep(time.Duration(m.ReportCountInterval) * time.Second)
 	for {
-		err := m.Send("http://" + m.Addr)
+		err := m.Send("http://" + m.Addr + "/update")
 		if err != nil {
+			logger.Log.Error("failed to Marshal body",
+				zap.String("operation", op),
+				zap.Error(err),
+			)
 			log.Print(err)
 		}
 		time.Sleep(time.Duration(m.ReportCountInterval) * time.Second)
 	}
 
+}
+func convertToFloat64(value interface{}) (float64, error) {
+	switch i := value.(type) {
+	case float64:
+		return i, nil
+	case float32:
+		return float64(i), nil
+	case uint64:
+		return float64(i), nil
+	case uint32:
+		return float64(i), nil
+	case int64:
+		return float64(i), nil
+	case int32:
+		return float64(i), nil
+	default:
+		return math.NaN(), errors.New("getFloat: unknown value is of incompatible type")
+	}
 }

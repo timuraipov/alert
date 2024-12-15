@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/timuraipov/alert/internal/common"
 	"github.com/timuraipov/alert/internal/domain/metric"
 )
 
@@ -12,35 +13,35 @@ func TestSaveGauge(t *testing.T) {
 	tests := []struct {
 		name       string
 		err        error
-		metrics    []metric.Metric
+		metrics    []metric.Metrics
 		want       float64
 		metricType string
 	}{
 		{
 			name: "positive Gauge",
 			err:  nil,
-			metrics: []metric.Metric{
+			metrics: []metric.Metrics{
 				{
-					Type:       metric.MetricTypeGauge,
-					Name:       "someName",
-					ValueGauge: 1.009,
+					MType: metric.MetricTypeGauge,
+					ID:    "someName",
+					Value: common.Pointer(1.009),
 				},
 			},
 			want: 1.009,
 		},
 		{
-			name: "positive Counter",
+			name: "positive multi Gauge",
 			err:  nil,
-			metrics: []metric.Metric{
+			metrics: []metric.Metrics{
 				{
-					Type:       metric.MetricTypeGauge,
-					Name:       "someName",
-					ValueGauge: 1.009,
+					MType: metric.MetricTypeGauge,
+					ID:    "someName",
+					Value: common.Pointer(1.001),
 				},
 				{
-					Type:       metric.MetricTypeGauge,
-					Name:       "someName",
-					ValueGauge: 12.009,
+					MType: metric.MetricTypeGauge,
+					ID:    "someName",
+					Value: common.Pointer(12.009),
 				},
 			},
 			want: 12.009,
@@ -50,13 +51,14 @@ func TestSaveGauge(t *testing.T) {
 	for _, test := range tests {
 		saver, err := New()
 		assert.NoError(t, err)
+		var currentData metric.Metrics
 		t.Run(test.name, func(t *testing.T) {
 			for _, metric := range test.metrics {
-				err := saver.Save(metric)
+				currentData, err = saver.Save(metric)
 				assert.NoError(t, err)
 			}
 
-			assert.Equal(t, test.want, saver.DBGauge[test.metrics[0].Name])
+			assert.Equal(t, test.want, *(currentData.Value))
 		})
 	}
 }
@@ -65,18 +67,18 @@ func TestSaveCounter(t *testing.T) {
 	tests := []struct {
 		name       string
 		err        error
-		metrics    []metric.Metric
+		metrics    []metric.Metrics
 		want       int64
 		metricType string
 	}{
 		{
 			name: "positive Counter 1 value",
 			err:  nil,
-			metrics: []metric.Metric{
+			metrics: []metric.Metrics{
 				{
-					Type:         metric.MetricTypeCounter,
-					Name:         "someName",
-					ValueCounter: 50,
+					MType: metric.MetricTypeCounter,
+					ID:    "someName",
+					Delta: common.Pointer(int64(50)),
 				},
 			},
 			want: 50,
@@ -84,21 +86,21 @@ func TestSaveCounter(t *testing.T) {
 		{
 			name: "positive Counter multi value",
 			err:  nil,
-			metrics: []metric.Metric{
+			metrics: []metric.Metrics{
 				{
-					Type:         metric.MetricTypeCounter,
-					Name:         "someName",
-					ValueCounter: 1,
+					MType: metric.MetricTypeCounter,
+					ID:    "someName",
+					Delta: common.Pointer(int64(1)),
 				},
 				{
-					Type:         metric.MetricTypeCounter,
-					Name:         "someName",
-					ValueCounter: 2,
+					MType: metric.MetricTypeCounter,
+					ID:    "someName",
+					Delta: common.Pointer(int64(2)),
 				},
 				{
-					Type:         metric.MetricTypeCounter,
-					Name:         "someName",
-					ValueCounter: 1000,
+					MType: metric.MetricTypeCounter,
+					ID:    "someName",
+					Delta: common.Pointer(int64(1000)),
 				},
 			},
 			want: 1003,
@@ -108,38 +110,39 @@ func TestSaveCounter(t *testing.T) {
 	for _, test := range tests {
 		saver, err := New()
 		assert.NoError(t, err)
+		var currentData metric.Metrics
 		t.Run(test.name, func(t *testing.T) {
 			for _, metric := range test.metrics {
-				err := saver.Save(metric)
+				currentData, err = saver.Save(metric)
 				assert.NoError(t, err)
 			}
 
-			assert.Equal(t, test.want, saver.DBCounter[test.metrics[0].Name])
+			assert.Equal(t, test.want, *(currentData.Delta))
 		})
 	}
 }
 func Seed(storage *InMemory) {
-	seeds := []metric.Metric{
+	seeds := []metric.Metrics{
 		{
-			Type:         metric.MetricTypeCounter,
-			Name:         "counterKey",
-			ValueCounter: 50,
+			MType: metric.MetricTypeCounter,
+			ID:    "counterKey",
+			Delta: common.Pointer(int64(50)),
 		},
 		{
-			Type:         metric.MetricTypeCounter,
-			Name:         "counterKey",
-			ValueCounter: 1,
+			MType: metric.MetricTypeCounter,
+			ID:    "counterKey",
+			Delta: common.Pointer(int64(1)),
 		},
 
 		{
-			Type:       metric.MetricTypeGauge,
-			Name:       "gaugeKey",
-			ValueGauge: 2.01,
+			MType: metric.MetricTypeGauge,
+			ID:    "gaugeKey",
+			Value: common.Pointer(2.01),
 		},
 		{
-			Type:       metric.MetricTypeGauge,
-			Name:       "gaugeKey2",
-			ValueGauge: 1000.001,
+			MType: metric.MetricTypeGauge,
+			ID:    "gaugeKey2",
+			Value: common.Pointer(1000.001),
 		},
 	}
 	for _, seed := range seeds {
@@ -148,16 +151,54 @@ func Seed(storage *InMemory) {
 }
 func TestGetAll(t *testing.T) {
 	tests := []struct {
-		name string
-		want map[string]interface{}
+		name  string
+		want  metric.Metrics
+		found bool
 	}{
 		{
-			name: "positive test",
-			want: map[string]interface{}{
-				"counterKey": 51,
-				"gaugeKey":   2.01,
-				"gaugeKey2":  1000.001,
+			name: "positive test counter",
+			want: metric.Metrics{
+				ID:    "counterKey",
+				MType: metric.MetricTypeCounter,
+				Delta: common.Pointer(int64(51)),
 			},
+			found: true,
+		},
+		{
+			name: "positive test gauge",
+			want: metric.Metrics{
+				ID:    "gaugeKey",
+				MType: metric.MetricTypeGauge,
+				Value: common.Pointer(2.01),
+			},
+			found: true,
+		},
+		{
+			name: "positive test gauge case2",
+			want: metric.Metrics{
+				ID:    "gaugeKey2",
+				MType: metric.MetricTypeGauge,
+				Value: common.Pointer(1000.001),
+			},
+			found: true,
+		},
+		{
+			name: "negative test counter ",
+			want: metric.Metrics{
+				ID:    "counterKeyNotExist",
+				MType: metric.MetricTypeCounter,
+				Value: common.Pointer(1000.001),
+			},
+			found: false,
+		},
+		{
+			name: "negative test gauge",
+			want: metric.Metrics{
+				ID:    "gaugeKeyNotExist",
+				MType: metric.MetricTypeCounter,
+				Value: common.Pointer(1000.001),
+			},
+			found: false,
 		},
 	}
 	storage, err := New()
@@ -165,9 +206,28 @@ func TestGetAll(t *testing.T) {
 		fmt.Print(err)
 	}
 	Seed(storage)
+	contains := func(slice []metric.Metrics, value metric.Metrics) bool {
+		for _, elem := range slice {
+			if elem.ID == value.ID && elem.MType == value.MType {
+				switch value.MType {
+				case metric.MetricTypeCounter:
+					if *(elem.Delta) == *(value.Delta) {
+						return true
+					}
+				case metric.MetricTypeGauge:
+					if *(elem.Value) == *(value.Value) {
+						return true
+					}
+				}
+
+			}
+		}
+		return false
+	}
+	resMetrics := storage.GetAll()
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			assert.Equal(t, fmt.Sprint(test.want), fmt.Sprint(storage.GetAll()))
+			assert.Equal(t, test.found, contains(resMetrics, test.want))
 		})
 	}
 }
@@ -223,10 +283,17 @@ func TestGetByTypeAndName(t *testing.T) {
 	Seed(storage)
 	for _, test := range tests {
 		t.Run(test.testName, func(t *testing.T) {
-			res, found := storage.GetByTypeAndName(test.metricType, test.metricName)
+			resMetric, found := storage.GetByTypeAndName(test.metricType, test.metricName)
 			assert.Equal(t, test.found, found)
 			if test.found {
-				assert.Equal(t, test.want, res)
+				switch test.metricType {
+				case metric.MetricTypeGauge:
+					assert.Equal(t, test.want, *(resMetric.Value))
+				case metric.MetricTypeCounter:
+					assert.Equal(t, test.want, *(resMetric.Delta))
+				default:
+					t.Errorf("unknown Mtype:%s", resMetric.MType)
+				}
 			}
 		})
 	}

@@ -18,8 +18,8 @@ func New() chi.Router {
 func MetricsRouter(handler metrics.MetricHandler) chi.Router {
 	r := chi.NewRouter()
 	r.Use(logger.WithLogging)
-	r.Post("/update/{type}/{name}/{val}", handler.Update)
-	r.Get("/value/{type}/{name}", handler.GetByName)
+	r.Post("/update", handler.Update)
+	r.Get("/value", handler.GetByName)
 	r.Get("/", handler.GetAll)
 	return r
 }
