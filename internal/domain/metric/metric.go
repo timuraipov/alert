@@ -5,12 +5,6 @@ const (
 	MetricTypeCounter = "counter"
 )
 
-type Metric struct {
-	Type         string
-	Name         string
-	ValueCounter int64
-	ValueGauge   float64
-}
 type Metrics struct {
 	ID    string   `json:"id"`              // имя метрики
 	MType string   `json:"type"`            // параметр, принимающий значение gauge или counter

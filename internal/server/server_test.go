@@ -149,7 +149,7 @@ func TestAll(t *testing.T) {
 			name:         "positive get All",
 			path:         "/",
 			method:       http.MethodGet,
-			expectedCode: http.StatusBadRequest,
+			expectedCode: http.StatusOK,
 			expectedJson: `[{"type":"gauge","id":"Alloc","value":100.11},{"id":"PollCount","delta":105,"type":"counter"}]`,
 		},
 	}
