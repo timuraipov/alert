@@ -132,13 +132,12 @@ func (mh *MetricHandler) Update(w http.ResponseWriter, r *http.Request) {
 }
 
 func parseAndValidate(metrics metric.Metrics) error {
-
-	if !(metrics.MType == metric.MetricTypeCounter || metrics.MType == metric.MetricTypeGauge) {
-
-		return ErrMetricTypeIsEnum
-	}
 	if metrics.MType == "" {
 		return ErrMetricNameRequired
 	}
+	if !(metrics.MType == metric.MetricTypeCounter || metrics.MType == metric.MetricTypeGauge) {
+		return ErrMetricTypeIsEnum
+	}
+
 	return nil
 }
