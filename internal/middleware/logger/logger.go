@@ -1,10 +1,7 @@
 package logger
 
 import (
-	"bytes"
 	"fmt"
-	"io/ioutil"
-	"log"
 	"net/http"
 	"time"
 
@@ -16,7 +13,6 @@ type (
 		URI      string
 		method   string
 		duration time.Duration
-		body     string
 	}
 	responseLog struct {
 		status int
@@ -59,23 +55,12 @@ func WithLogging(h http.Handler) http.Handler {
 			ResponseWriter: w, // встраиваем оригинальный http.ResponseWriter
 			responseData:   responseData,
 		}
-		body, err := ioutil.ReadAll(r.Body)
-		if err != nil {
-			log.Printf("Error reading body: %v", err)
-			http.Error(w, "can't read body", http.StatusBadRequest)
-			return
-		}
-		r.Body = ioutil.NopCloser(bytes.NewBuffer(body))
-
 		h.ServeHTTP(&lw, r) // внедряем реализацию http.ResponseWriter
 
 		duration := time.Since(start)
 
-		if err != nil {
-			logger.Log.Info("can't parse")
-		}
 		logger.Log.Sugar().Info(
-			"request", fmt.Sprintf(`{"URI":%v,"method":"%v","duration":%v, "body": "%v"}`, r.RequestURI, r.Method, duration, string(body)),
+			"request", fmt.Sprintf(`{"URI":%v,"method":"%v","duration":%v}`, r.RequestURI, r.Method, duration),
 			"response", fmt.Sprintf(`{"status":%v,"size":%v}`, responseData.status, responseData.size),
 		)
 	}
