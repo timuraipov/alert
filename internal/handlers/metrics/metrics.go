@@ -28,13 +28,6 @@ var (
 	ErrMetricTypeIsEnum   = errors.New("metric type should be gauge or counter")
 )
 
-type metricResponse struct {
-	ID    string   `json:"ID"`
-	MType string   `json:"MType"`
-	Delta *int64   `json:"Delta,omitempty"`
-	Value *float64 `json:"Value,omitempty"`
-}
-
 func (mh *MetricHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	op := "handlers.metrics.GetAll"
 
@@ -50,7 +43,7 @@ func (mh *MetricHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 }
 func (mh *MetricHandler) GetByNameJSON(w http.ResponseWriter, r *http.Request) {
 	op := "handlers.metrics.GetByName"
-	var myMetrics metricResponse
+	var metrics metric.Metrics
 	var buf bytes.Buffer
 	_, err := buf.ReadFrom(r.Body)
 	if err != nil {
@@ -64,7 +57,7 @@ func (mh *MetricHandler) GetByNameJSON(w http.ResponseWriter, r *http.Request) {
 		zap.String("operation", op),
 		zap.String("requestBody", buf.String()),
 	)
-	if err := json.Unmarshal(buf.Bytes(), &myMetrics); err != nil {
+	if err := json.Unmarshal(buf.Bytes(), &metrics); err != nil {
 		logger.Log.Error("failed to Unmarshal body",
 			zap.String("operation", op),
 			zap.Error(err),
@@ -72,13 +65,13 @@ func (mh *MetricHandler) GetByNameJSON(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	val, ok := mh.Storage.GetByTypeAndName(myMetrics.MType, myMetrics.ID)
+	val, ok := mh.Storage.GetByTypeAndName(metrics.MType, metrics.ID)
 	if !ok {
 		w.WriteHeader(http.StatusNotFound)
 	} else {
-		myMetrics.Delta = val.Delta
-		myMetrics.Value = val.Value
-		responseBody, err := json.Marshal(myMetrics)
+		metrics.Delta = val.Delta
+		metrics.Value = val.Value
+		responseBody, err := json.Marshal(metrics)
 		if err != nil {
 			logger.Log.Error("failed to Marshal response",
 				zap.String("operation", op),

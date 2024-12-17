@@ -286,18 +286,12 @@ func TestAll(t *testing.T) {
 
 func TestGetByTypeAndNameJson(t *testing.T) {
 
-	type metricReqRes struct {
-		ID    string   `json:"ID"`
-		MType string   `json:"MType"`
-		Delta *int64   `json:"Delta,omitempty"`
-		Value *float64 `json:"Value,omitempty"`
-	}
 	testCases := []struct {
 		name          string
 		path          string
 		method        string
 		expectedCode  int
-		metricReqBody metricReqRes
+		metricReqBody metric.Metrics
 		expectedJSON  string
 	}{
 		{
@@ -305,22 +299,22 @@ func TestGetByTypeAndNameJson(t *testing.T) {
 			path:         "/value/",
 			method:       http.MethodPost,
 			expectedCode: http.StatusOK,
-			metricReqBody: metricReqRes{
+			metricReqBody: metric.Metrics{
 				ID:    "PollCount",
 				MType: "counter",
 			},
-			expectedJSON: `{"ID":"PollCount","MType":"counter","Delta":105}`,
+			expectedJSON: `{"id":"PollCount","type":"counter","delta":105}`,
 		},
 		{
 			name:         "positive get Alloc type gauge",
 			path:         "/value/",
 			method:       http.MethodPost,
 			expectedCode: http.StatusOK,
-			metricReqBody: metricReqRes{
+			metricReqBody: metric.Metrics{
 				ID:    "Alloc",
 				MType: "gauge",
 			},
-			expectedJSON: `{"ID":"Alloc","MType":"gauge","Value":100.11}`,
+			expectedJSON: `{"id":"Alloc","type":"gauge","value":100.11}`,
 		},
 	}
 	storage, err := inmemory.New()
