@@ -254,14 +254,14 @@ func TestAll(t *testing.T) {
 		path         string
 		method       string
 		expectedCode int
-		expectedJson string
+		expectedJSON string
 	}{
 		{
 			name:         "positive get All",
 			path:         "/",
 			method:       http.MethodGet,
 			expectedCode: http.StatusOK,
-			expectedJson: `[{"type":"gauge","id":"Alloc","value":100.11},{"id":"PollCount","delta":105,"type":"counter"}]`,
+			expectedJSON: `[{"type":"gauge","id":"Alloc","value":100.11},{"id":"PollCount","delta":105,"type":"counter"}]`,
 		},
 	}
 	storage, err := inmemory.New()
@@ -278,7 +278,7 @@ func TestAll(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			resp, jsonBody := testRequest(t, ts, tt.method, tt.path, bytes.NewReader(nil))
 			assert.Equal(t, tt.expectedCode, resp.StatusCode)
-			assert.JSONEq(t, tt.expectedJson, jsonBody)
+			assert.JSONEq(t, tt.expectedJSON, jsonBody)
 			resp.Body.Close()
 		})
 	}
@@ -298,7 +298,7 @@ func TestGetByTypeAndNameJson(t *testing.T) {
 		method        string
 		expectedCode  int
 		metricReqBody metricReqRes
-		expectedJson  string
+		expectedJSON  string
 	}{
 		{
 			name:         "positive get PollCount type counter",
@@ -309,7 +309,7 @@ func TestGetByTypeAndNameJson(t *testing.T) {
 				ID:    "PollCount",
 				MType: "counter",
 			},
-			expectedJson: `{"ID":"PollCount","MType":"counter","Delta":105}`,
+			expectedJSON: `{"ID":"PollCount","MType":"counter","Delta":105}`,
 		},
 		{
 			name:         "positive get Alloc type gauge",
@@ -320,7 +320,7 @@ func TestGetByTypeAndNameJson(t *testing.T) {
 				ID:    "Alloc",
 				MType: "gauge",
 			},
-			expectedJson: `{"ID":"Alloc","MType":"gauge","Value":100.11}`,
+			expectedJSON: `{"ID":"Alloc","MType":"gauge","Value":100.11}`,
 		},
 	}
 	storage, err := inmemory.New()
@@ -341,7 +341,7 @@ func TestGetByTypeAndNameJson(t *testing.T) {
 			resp.Body.Close()
 			assert.Equal(t, tt.expectedCode, resp.StatusCode)
 			if tt.expectedCode == http.StatusOK {
-				assert.JSONEq(t, tt.expectedJson, jsonBody) // на сколько хорошо проверять таким образом?
+				assert.JSONEq(t, tt.expectedJSON, jsonBody) // на сколько хорошо проверять таким образом?
 			}
 		})
 	}
