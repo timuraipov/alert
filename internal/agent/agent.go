@@ -142,7 +142,7 @@ func (m *MetricsCollector) Run() {
 	}()
 	time.Sleep(time.Duration(m.ReportCountInterval) * time.Second)
 	for {
-		err := m.Send("http://" + m.Addr + "/update")
+		err := m.Send("http://" + m.Addr + "/update/")
 		if err != nil {
 			logger.Log.Error("failed to Marshal body",
 				zap.String("operation", op),

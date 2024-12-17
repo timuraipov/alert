@@ -100,7 +100,7 @@ func TestUpdateJson(t *testing.T) {
 	}{
 		{
 			name:   "positive Counter",
-			path:   "/update",
+			path:   "/update/",
 			method: http.MethodPost,
 			metric: metric.Metrics{
 				ID:    "PollCount",
@@ -116,7 +116,7 @@ func TestUpdateJson(t *testing.T) {
 		},
 		{
 			name:   "positive Counter case2",
-			path:   "/update",
+			path:   "/update/",
 			method: http.MethodPost,
 			metric: metric.Metrics{
 				ID:    "PollCount",
@@ -132,7 +132,7 @@ func TestUpdateJson(t *testing.T) {
 		},
 		{
 			name:   "positive Gauge",
-			path:   "/update",
+			path:   "/update/",
 			method: http.MethodPost,
 			metric: metric.Metrics{
 				ID:    "Alloc",
@@ -148,7 +148,7 @@ func TestUpdateJson(t *testing.T) {
 		},
 		{
 			name:   "negative Unsupported Type",
-			path:   "/update",
+			path:   "/update/",
 			method: http.MethodPost,
 			metric: metric.Metrics{
 				ID:    "Alloc",
@@ -159,7 +159,7 @@ func TestUpdateJson(t *testing.T) {
 		},
 		{
 			name:   "negative Gauge mType has empty type",
-			path:   "/update",
+			path:   "/update/",
 			method: http.MethodPost,
 			metric: metric.Metrics{
 				ID:    "Alloc",
@@ -302,7 +302,7 @@ func TestGetByTypeAndNameJson(t *testing.T) {
 	}{
 		{
 			name:         "positive get PollCount type counter",
-			path:         "/value",
+			path:         "/value/",
 			method:       http.MethodPost,
 			expectedCode: http.StatusOK,
 			metricReqBody: metricReqRes{
@@ -313,7 +313,7 @@ func TestGetByTypeAndNameJson(t *testing.T) {
 		},
 		{
 			name:         "positive get Alloc type gauge",
-			path:         "/value",
+			path:         "/value/",
 			method:       http.MethodPost,
 			expectedCode: http.StatusOK,
 			metricReqBody: metricReqRes{
