@@ -60,6 +60,10 @@ func (mh *MetricHandler) GetByNameJSON(w http.ResponseWriter, r *http.Request) {
 			zap.Error(err),
 		)
 	}
+	logger.Log.Info("get request body",
+		zap.String("operation", op),
+		zap.String("requestBody", buf.String()),
+	)
 	if err := json.Unmarshal(buf.Bytes(), &myMetrics); err != nil {
 		logger.Log.Error("failed to Unmarshal body",
 			zap.String("operation", op),
@@ -117,6 +121,10 @@ func (mh *MetricHandler) UpdateJSON(w http.ResponseWriter, r *http.Request) {
 			zap.Error(err),
 		)
 	}
+	logger.Log.Info("get request body",
+		zap.String("operation", op),
+		zap.String("requestBody", buf.String()),
+	)
 	if err := json.Unmarshal(buf.Bytes(), &myMetrics); err != nil {
 		logger.Log.Error("failed to Unmarshal body",
 			zap.String("operation", op),
