@@ -17,6 +17,73 @@ import (
 )
 
 func TestUpdate(t *testing.T) {
+	testCases := []struct {
+		name         string
+		path         string
+		method       string
+		expectedCode int
+	}{
+		{
+			name:         "positive Counter",
+			path:         "/update/counter/PollCount/100",
+			method:       http.MethodPost,
+			expectedCode: http.StatusOK,
+		},
+		// {
+		// 	name:         "negative method GET",
+		// 	path:         "/update/counter/PollCount/100",
+		// 	method:       http.MethodGet,
+		// 	expectedCode: http.StatusForbidden,
+		// },
+		{
+			name:         "positive Gauge",
+			path:         "/update/gauge/Alloc/100.1",
+			method:       http.MethodPost,
+			expectedCode: http.StatusOK,
+		},
+		{
+			name:         "negative Gauge url shorter then must be",
+			path:         "/update/gauge/",
+			method:       http.MethodPost,
+			expectedCode: http.StatusNotFound,
+		},
+		{
+			name:         "negative Gauge value has incorrect type",
+			path:         "/update/gauge/Alloc/asf",
+			method:       http.MethodPost,
+			expectedCode: http.StatusBadRequest,
+		},
+		{
+			name:         "negative Gauge type has incorrect value",
+			path:         "/update/someType/Alloc/asf",
+			method:       http.MethodPost,
+			expectedCode: http.StatusBadRequest,
+		},
+		{
+			name:         "negative case without type",
+			path:         "/update/Alloc/asf",
+			method:       http.MethodPost,
+			expectedCode: http.StatusNotFound,
+		},
+	}
+	storage, err := inmemory.New()
+	if err != nil {
+		panic(err)
+	}
+	metricsHandler := metrics.MetricHandler{
+		Storage: storage,
+	}
+	ts := httptest.NewServer(MetricsRouter(metricsHandler))
+	defer ts.Close()
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			resp, _ := testRequest(t, ts, tt.method, tt.path, bytes.NewReader(nil))
+			defer resp.Body.Close()
+			assert.Equal(t, tt.expectedCode, resp.StatusCode)
+		})
+	}
+}
+func TestUpdateJson(t *testing.T) {
 	type expectedBody struct {
 		id    string
 		mType string
@@ -126,6 +193,50 @@ func TestUpdate(t *testing.T) {
 		})
 	}
 }
+
+func TestGetByTypeAndName(t *testing.T) {
+	testCases := []struct {
+		name         string
+		path         string
+		method       string
+		expectedCode int
+		expectedBody string
+	}{
+		{
+			name:         "positive get Alloc",
+			path:         "/value/gauge/Alloc",
+			method:       http.MethodGet,
+			expectedCode: http.StatusOK,
+			expectedBody: "100.23",
+		},
+		{
+			name:         "positive get PollCount",
+			path:         "/value/counter/PollCount",
+			method:       http.MethodGet,
+			expectedCode: http.StatusOK,
+			expectedBody: "100",
+		},
+	}
+	storage, err := inmemory.New()
+	if err != nil {
+		panic(err)
+	}
+	metricsHandler := metrics.MetricHandler{
+		Storage: storage,
+	}
+	ts := httptest.NewServer(MetricsRouter(metricsHandler))
+	defer ts.Close()
+	storage.DBCounter["PollCount"] = 100
+	storage.DBGauge["Alloc"] = 100.23
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			resp, body := testRequest(t, ts, tt.method, tt.path, bytes.NewReader(nil))
+			defer resp.Body.Close()
+			assert.Equal(t, tt.expectedCode, resp.StatusCode)
+			assert.Equal(t, tt.expectedBody, body)
+		})
+	}
+}
 func testRequest(t *testing.T, ts *httptest.Server, method string, path string, serializedBody *bytes.Reader) (*http.Response, string) {
 	req, err := http.NewRequest(method, ts.URL+path, serializedBody)
 	require.NoError(t, err)
@@ -173,7 +284,7 @@ func TestAll(t *testing.T) {
 	}
 }
 
-func TestGetByTypeAndName(t *testing.T) {
+func TestGetByTypeAndNameJson(t *testing.T) {
 
 	type metricReqRes struct {
 		ID    string   `json:"ID"`
