@@ -30,7 +30,6 @@ var (
 
 func (mh *MetricHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	op := "handlers.metrics.GetAll"
-
 	metrics := mh.Storage.GetAll()
 	responseData, err := json.Marshal(metrics)
 	if err != nil {
@@ -39,7 +38,10 @@ func (mh *MetricHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 			zap.Error(err),
 		)
 	}
+	w.WriteHeader(http.StatusOK)
+	//if len(responseData) > 0 {
 	w.Write([]byte(responseData))
+	//}
 }
 func (mh *MetricHandler) GetByNameJSON(w http.ResponseWriter, r *http.Request) {
 	op := "handlers.metrics.GetByName"
