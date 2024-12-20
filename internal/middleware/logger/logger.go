@@ -9,15 +9,6 @@ import (
 )
 
 type (
-	requestLog struct {
-		URI      string
-		method   string
-		duration time.Duration
-	}
-	responseLog struct {
-		status int
-		size   int
-	}
 	// берём структуру для хранения сведений об ответе
 	responseData struct {
 		status int

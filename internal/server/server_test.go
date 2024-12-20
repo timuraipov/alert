@@ -2,10 +2,12 @@ package server
 
 import (
 	"bytes"
+	"compress/gzip"
 	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -77,19 +79,14 @@ func TestUpdate(t *testing.T) {
 	defer ts.Close()
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
-			resp, _ := testRequest(t, ts, tt.method, tt.path, bytes.NewReader(nil))
+			resp, _ := testRequest(t, ts, tt.method, tt.path, bytes.NewReader(nil), nil)
 			defer resp.Body.Close()
 			assert.Equal(t, tt.expectedCode, resp.StatusCode)
 		})
 	}
 }
 func TestUpdateJson(t *testing.T) {
-	type expectedBody struct {
-		id    string
-		mType string
-		delta *int64
-		value *float64
-	}
+
 	testCases := []struct {
 		name         string
 		path         string
@@ -182,7 +179,7 @@ func TestUpdateJson(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			requestBody, err := json.Marshal(tt.metric)
 			assert.NoError(t, err)
-			resp, actualMetric := testRequest(t, ts, tt.method, tt.path, bytes.NewReader(requestBody))
+			resp, actualMetric := testRequest(t, ts, tt.method, tt.path, bytes.NewReader(requestBody), nil)
 			expectedMetricBytes, err := json.Marshal(tt.expectedBody)
 			assert.NoError(t, err)
 			resp.Body.Close()
@@ -230,22 +227,12 @@ func TestGetByTypeAndName(t *testing.T) {
 	storage.DBGauge["Alloc"] = 100.23
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
-			resp, body := testRequest(t, ts, tt.method, tt.path, bytes.NewReader(nil))
+			resp, body := testRequest(t, ts, tt.method, tt.path, bytes.NewReader(nil), nil)
 			defer resp.Body.Close()
 			assert.Equal(t, tt.expectedCode, resp.StatusCode)
 			assert.Equal(t, tt.expectedBody, body)
 		})
 	}
-}
-func testRequest(t *testing.T, ts *httptest.Server, method string, path string, serializedBody *bytes.Reader) (*http.Response, string) {
-	req, err := http.NewRequest(method, ts.URL+path, serializedBody)
-	require.NoError(t, err)
-	resp, err := ts.Client().Do(req)
-	require.NoError(t, err)
-	defer resp.Body.Close()
-	respBody, err := io.ReadAll(resp.Body)
-	require.NoError(t, err)
-	return resp, string(respBody)
 }
 
 func TestAll(t *testing.T) {
@@ -276,7 +263,7 @@ func TestAll(t *testing.T) {
 	preSeed(storage)
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
-			resp, jsonBody := testRequest(t, ts, tt.method, tt.path, bytes.NewReader(nil))
+			resp, jsonBody := testRequest(t, ts, tt.method, tt.path, bytes.NewReader(nil), nil)
 			assert.Equal(t, tt.expectedCode, resp.StatusCode)
 			assert.JSONEq(t, tt.expectedJSON, jsonBody)
 			resp.Body.Close()
@@ -331,7 +318,7 @@ func TestGetByTypeAndNameJson(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			requestBody, err := json.Marshal(tt.metricReqBody)
 			assert.NoError(t, err)
-			resp, jsonBody := testRequest(t, ts, tt.method, tt.path, bytes.NewReader(requestBody))
+			resp, jsonBody := testRequest(t, ts, tt.method, tt.path, bytes.NewReader(requestBody), nil)
 			resp.Body.Close()
 			assert.Equal(t, tt.expectedCode, resp.StatusCode)
 			if tt.expectedCode == http.StatusOK {
@@ -339,6 +326,56 @@ func TestGetByTypeAndNameJson(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestGetByTypeAndNameGZIP(t *testing.T) {
+	requestBody := `{"id":"PollCount","type":"counter"}`
+	successBody := `{"id":"PollCount","type":"counter","delta":105}`
+	path := "/value/"
+	storage, err := inmemory.New()
+	if err != nil {
+		panic(err)
+	}
+	metricsHandler := metrics.MetricHandler{
+		Storage: storage,
+	}
+	ts := httptest.NewServer(MetricsRouter(metricsHandler))
+	defer ts.Close()
+	preSeed(storage)
+
+	t.Run("send ByTypeAndName gzip", func(t *testing.T) {
+		buf := bytes.NewBuffer(nil)
+		zb := gzip.NewWriter(buf)
+		_, err := zb.Write([]byte(requestBody))
+		require.NoError(t, err)
+		err = zb.Close()
+		require.NoError(t, err)
+
+		headers := make(map[string]string, 2)
+		headers["Content-Encoding"] = "gzip"
+		headers["Accept-Encoding"] = ""
+		assert.NoError(t, err)
+		resp, jsonBody := testRequest(t, ts, http.MethodPost, path, buf, &headers)
+		resp.Body.Close()
+
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+		assert.Equal(t, resp.StatusCode, http.StatusOK)
+		assert.JSONEq(t, successBody, jsonBody)
+	})
+	t.Run("send ByTypeAndName  accept gzip", func(t *testing.T) {
+		buf := bytes.NewBufferString(requestBody)
+		headers := make(map[string]string, 1)
+		headers["Accept-Encoding"] = "gzip"
+		resp, respBody := testRequest(t, ts, http.MethodPost, path, buf, &headers)
+		zr, err := gzip.NewReader(strings.NewReader(respBody))
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+		b, err := io.ReadAll(zr)
+		require.NoError(t, err)
+
+		require.JSONEq(t, successBody, string(b))
+
+	})
 }
 func preSeed(storage *inmemory.InMemory) {
 	seeds := []metric.Metrics{
@@ -361,4 +398,21 @@ func preSeed(storage *inmemory.InMemory) {
 	for _, seed := range seeds {
 		storage.Save(seed)
 	}
+}
+
+func testRequest(t *testing.T, ts *httptest.Server, method string, path string, serializedBody io.Reader, headers *map[string]string) (*http.Response, string) {
+	req, err := http.NewRequest(method, ts.URL+path, serializedBody)
+	require.NoError(t, err)
+	if headers != nil {
+		for key, val := range *headers {
+			req.Header.Set(key, val)
+		}
+	}
+
+	resp, err := ts.Client().Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	respBody, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	return resp, string(respBody)
 }

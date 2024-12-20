@@ -38,10 +38,10 @@ func (mh *MetricHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 			zap.Error(err),
 		)
 	}
+	w.Header().Set("Content-Type", "text/html")
 	w.WriteHeader(http.StatusOK)
-	//if len(responseData) > 0 {
+
 	w.Write([]byte(responseData))
-	//}
 }
 func (mh *MetricHandler) GetByNameJSON(w http.ResponseWriter, r *http.Request) {
 	op := "handlers.metrics.GetByName"

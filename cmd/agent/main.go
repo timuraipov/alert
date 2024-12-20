@@ -13,12 +13,13 @@ var PollCount int64
 
 func main() {
 	op := "agent.Main"
-	logger.Log.Sugar().Info("some log")
 	cfg, err := config.MustLoad()
-	logger.Initialize(cfg.FlagLogLevel)
-
 	if err != nil {
 		log.Fatal(err)
+	}
+	err = logger.Initialize(cfg.FlagLogLevel)
+	if err != nil {
+		log.Print("problem with logger", err)
 	}
 	logger.Log.Info("Starting to collect agent data",
 		zap.String("operation", op),
