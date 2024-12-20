@@ -368,6 +368,7 @@ func TestGetByTypeAndNameGZIP(t *testing.T) {
 		headers["Accept-Encoding"] = "gzip"
 		resp, respBody := testRequest(t, ts, http.MethodPost, path, buf, &headers)
 		zr, err := gzip.NewReader(strings.NewReader(respBody))
+		resp.Body.Close()
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
 		b, err := io.ReadAll(zr)
