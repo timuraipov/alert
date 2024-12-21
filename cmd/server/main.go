@@ -2,7 +2,6 @@ package main
 
 import (
 	"log"
-	"net/http"
 
 	"github.com/timuraipov/alert/internal/config"
 	"github.com/timuraipov/alert/internal/logger"
@@ -18,7 +17,8 @@ func main() {
 		panic(err)
 	}
 	server := server.New(cfg)
-	err = http.ListenAndServe(cfg.FlagRunAddr, server)
+
+	err = server.ListenAndServe()
 	if err != nil {
 		panic(err)
 	}

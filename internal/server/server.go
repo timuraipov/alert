@@ -1,6 +1,14 @@
 package server
 
 import (
+	"context"
+	"log"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
 	"github.com/go-chi/chi/v5"
 	"github.com/timuraipov/alert/internal/config"
 	"github.com/timuraipov/alert/internal/filestorage"
@@ -12,21 +20,22 @@ import (
 	"go.uber.org/zap"
 )
 
-func New(cfg *config.Config) chi.Router {
-	storage, _ := inmemory.New()
-	fileStorage, err := filestorage.NewStorage(cfg.FileStoragePath)
-	if err != nil {
-		logger.Log.Error("failed to create new FileStorage", zap.Error(err))
-	}
-	metricsHandler := metrics.MetricHandler{
-		Storage:     storage,
-		FileStorage: fileStorage,
-		Congig:      cfg,
-	}
-	r := MetricsRouter(metricsHandler)
-	return r
+type Server struct {
+	r              chi.Router
+	metricsHandler *metrics.MetricHandler
+	cfg            *config.Config
 }
-func MetricsRouter(handler metrics.MetricHandler) chi.Router {
+
+func New(cfg *config.Config) *Server {
+
+	storage, _ := inmemory.New()
+	fileStorage := filestorage.NewStorage(cfg.FileStoragePath)
+
+	metricsHandler := metrics.New(storage, fileStorage, cfg)
+	r := MetricsRouter(metricsHandler)
+	return &Server{r: r, metricsHandler: metricsHandler, cfg: cfg}
+}
+func MetricsRouter(handler *metrics.MetricHandler) chi.Router {
 	r := chi.NewRouter()
 	r.Use(middlewareLogger.WithLogging)
 	r.Use(gzip.GzipMiddleware)
@@ -36,4 +45,47 @@ func MetricsRouter(handler metrics.MetricHandler) chi.Router {
 	r.Get("/value/{type}/{name}", handler.GetByName)
 	r.Get("/", handler.GetAll)
 	return r
+}
+func (s *Server) ListenAndServe() error {
+
+	server := &http.Server{Addr: s.cfg.FlagRunAddr, Handler: s.r}
+
+	serverCtx, serverStopCtx := context.WithCancel(context.Background())
+	// Listen for syscall signals for process to interrupt/quit
+	sig := make(chan os.Signal, 1)
+	signal.Notify(sig, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+	go func() {
+		signal := <-sig
+		logger.Log.Info("get shutdown signal", zap.String("signal", signal.String()))
+
+		// Shutdown signal with grace period of 30 seconds
+		shutdownCtx, _ := context.WithTimeout(serverCtx, 30*time.Second)
+
+		go func() {
+			<-shutdownCtx.Done()
+			if shutdownCtx.Err() == context.DeadlineExceeded {
+				log.Fatal("graceful shutdown timed out.. forcing exit.")
+			}
+		}()
+		err := s.metricsHandler.Shutdown()
+		if err != nil {
+			logger.Log.Error("failed to shutdown metrics", zap.Error(err))
+
+		}
+		// Trigger graceful shutdown
+		err = server.Shutdown(shutdownCtx)
+		if err != nil {
+			log.Fatal(err)
+		}
+		serverStopCtx()
+	}()
+	// Run the server
+	err := server.ListenAndServe()
+	if err != nil && err != http.ErrServerClosed {
+		return err
+	}
+
+	// Wait for server context to be stopped
+	<-serverCtx.Done()
+	return nil
 }

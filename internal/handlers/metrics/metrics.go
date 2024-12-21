@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/timuraipov/alert/internal/config"
@@ -22,20 +23,59 @@ type MetricStorage interface {
 	GetByTypeAndName(metricType, metricName string) (metric.Metrics, bool)
 }
 type MetricHandler struct {
-	Storage     MetricStorage
-	FileStorage *filestorage.Storage
-	Congig      *config.Config
+	Storage         MetricStorage
+	fileStorage     *filestorage.Storage
+	config          *config.Config
+	IsNeedSyncFlush bool
 }
 
-func (mh *MetricHandler) Load() {
+func New(storage MetricStorage, fileStorage *filestorage.Storage, cfg *config.Config) *MetricHandler {
+	metricsHandler := &MetricHandler{
+		Storage:     storage,
+		fileStorage: fileStorage,
+		config:      cfg,
+	}
+	metricsHandler.init()
+	return metricsHandler
+}
+func (mh *MetricHandler) init() {
+	if mh.config.Restore {
+		mh.load()
+	}
+	if mh.config.StoreInterval == 0 {
+		mh.IsNeedSyncFlush = true
+	} else {
+		tickerFlushToDisk := time.NewTicker(time.Duration(mh.config.StoreInterval) * time.Second)
+		done := make(chan struct{})
+		go func() {
+			for {
+				select {
+				case <-tickerFlushToDisk.C:
+					mh.flush()
+				case <-done:
+					tickerFlushToDisk.Stop()
+					return
+				}
+			}
+		}()
+	}
+
+	//---
+
+}
+func (mh *MetricHandler) Shutdown() error {
+	return mh.flush()
+}
+
+func (mh *MetricHandler) load() error {
 	metrics := make([]metric.Metrics, 0)
-	data, err := mh.FileStorage.Read()
+	data, err := mh.fileStorage.Read()
 	if err != nil {
-		logger.Log.Error("failed to load file", zap.Error(err))
+		logger.Log.Error("failed to load file", zap.Error(err), zap.String("data", string(data)))
 	}
 	err = json.Unmarshal(data, &metrics)
 	if err != nil {
-		logger.Log.Error("failed to load file", zap.Error(err))
+		return fmt.Errorf("failed to load file %w", err)
 	}
 	for _, parsedMetric := range metrics {
 		_, err = mh.Storage.Save(parsedMetric)
@@ -43,19 +83,25 @@ func (mh *MetricHandler) Load() {
 			logger.Log.Error("failed to save metric", zap.Error(err))
 		}
 	}
+	return nil
 }
 
-func (mh *MetricHandler) Flush() {
+func (mh *MetricHandler) flush() error {
+	logger.Log.Debug(
+		"called flush to disk method", zap.String("op", "op"),
+	)
 	metrics := mh.Storage.GetAll()
-	data, err := json.Marshal(metrics)
-	if err != nil {
-		logger.Log.Error("failed to Marshal metrics", zap.Error(err))
+	if len(metrics) > 0 {
+		data, err := json.Marshal(metrics)
+		if err != nil {
+			return fmt.Errorf("failed to Marshal metrics %w", err)
+		}
+		err = mh.fileStorage.Write(data)
+		if err != nil {
+			return fmt.Errorf("failed write metrics to disk %w", err)
+		}
 	}
-	logger.Log.Info("Flush metrics to disk", zap.String("flushed metrics", string(data)))
-	err = mh.FileStorage.Write(data)
-	if err != nil {
-		logger.Log.Error("failed write metrics to disk", zap.Error(err))
-	}
+	return nil
 }
 
 var (
@@ -90,7 +136,7 @@ func (mh *MetricHandler) GetByNameJSON(w http.ResponseWriter, r *http.Request) {
 			zap.Error(err),
 		)
 	}
-	logger.Log.Info("get request body",
+	logger.Log.Debug("get request body",
 		zap.String("operation", op),
 		zap.String("requestBody", buf.String()),
 	)
@@ -151,7 +197,7 @@ func (mh *MetricHandler) UpdateJSON(w http.ResponseWriter, r *http.Request) {
 			zap.Error(err),
 		)
 	}
-	logger.Log.Info("get request body",
+	logger.Log.Debug("get request body",
 		zap.String("operation", op),
 		zap.String("requestBody", buf.String()),
 	)
@@ -185,6 +231,12 @@ func (mh *MetricHandler) UpdateJSON(w http.ResponseWriter, r *http.Request) {
 			zap.Error(err),
 		)
 	}
+	if mh.IsNeedSyncFlush {
+		err := mh.flush()
+		if err != nil {
+			logger.Log.Error("can't flush metrics on disk", zap.Error(err))
+		}
+	}
 	w.WriteHeader(http.StatusOK)
 	w.Write(responseBody)
 }
@@ -213,6 +265,10 @@ func (mh *MetricHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_, err = mh.Storage.Save(*metric)
+	if mh.IsNeedSyncFlush {
+		err := mh.flush()
+		logger.Log.Error("can't flush metrics on disk", zap.Error(err))
+	}
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
