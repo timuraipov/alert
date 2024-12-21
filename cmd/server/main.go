@@ -17,7 +17,7 @@ func main() {
 	if err := logger.Initialize(cfg.FlagLogLevel); err != nil {
 		panic(err)
 	}
-	server := server.New()
+	server := server.New(cfg)
 	err = http.ListenAndServe(cfg.FlagRunAddr, server)
 	if err != nil {
 		panic(err)

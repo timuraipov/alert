@@ -9,7 +9,9 @@ import (
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/timuraipov/alert/internal/config"
 	"github.com/timuraipov/alert/internal/domain/metric"
+	"github.com/timuraipov/alert/internal/filestorage"
 	"github.com/timuraipov/alert/internal/logger"
 	"go.uber.org/zap"
 )
@@ -20,7 +22,40 @@ type MetricStorage interface {
 	GetByTypeAndName(metricType, metricName string) (metric.Metrics, bool)
 }
 type MetricHandler struct {
-	Storage MetricStorage
+	Storage     MetricStorage
+	FileStorage *filestorage.Storage
+	Congig      *config.Config
+}
+
+func (mh *MetricHandler) Load() {
+	metrics := make([]metric.Metrics, 0)
+	data, err := mh.FileStorage.Read()
+	if err != nil {
+		logger.Log.Error("failed to load file", zap.Error(err))
+	}
+	err = json.Unmarshal(data, &metrics)
+	if err != nil {
+		logger.Log.Error("failed to load file", zap.Error(err))
+	}
+	for _, parsedMetric := range metrics {
+		_, err = mh.Storage.Save(parsedMetric)
+		if err != nil {
+			logger.Log.Error("failed to save metric", zap.Error(err))
+		}
+	}
+}
+
+func (mh *MetricHandler) Flush() {
+	metrics := mh.Storage.GetAll()
+	data, err := json.Marshal(metrics)
+	if err != nil {
+		logger.Log.Error("failed to Marshal metrics", zap.Error(err))
+	}
+	logger.Log.Info("Flush metrics to disk", zap.String("flushed metrics", string(data)))
+	err = mh.FileStorage.Write(data)
+	if err != nil {
+		logger.Log.Error("failed write metrics to disk", zap.Error(err))
+	}
 }
 
 var (
