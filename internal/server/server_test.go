@@ -13,7 +13,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/timuraipov/alert/internal/common"
+	"github.com/timuraipov/alert/internal/config"
 	"github.com/timuraipov/alert/internal/domain/metric"
+	"github.com/timuraipov/alert/internal/filestorage"
 	"github.com/timuraipov/alert/internal/handlers/metrics"
 	"github.com/timuraipov/alert/internal/storage/inmemory"
 )
@@ -68,14 +70,8 @@ func TestUpdate(t *testing.T) {
 			expectedCode: http.StatusNotFound,
 		},
 	}
-	storage, err := inmemory.New()
-	if err != nil {
-		panic(err)
-	}
-	metricsHandler := metrics.MetricHandler{
-		Storage: storage,
-	}
-	ts := httptest.NewServer(MetricsRouter(metricsHandler))
+
+	ts, _ := getServer()
 	defer ts.Close()
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
@@ -166,14 +162,8 @@ func TestUpdateJson(t *testing.T) {
 			expectedCode: http.StatusNotFound,
 		},
 	}
-	storage, err := inmemory.New()
-	if err != nil {
-		panic(err)
-	}
-	metricsHandler := metrics.MetricHandler{
-		Storage: storage,
-	}
-	ts := httptest.NewServer(MetricsRouter(metricsHandler))
+
+	ts, _ := getServer()
 	defer ts.Close()
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
@@ -204,27 +194,21 @@ func TestGetByTypeAndName(t *testing.T) {
 			path:         "/value/gauge/Alloc",
 			method:       http.MethodGet,
 			expectedCode: http.StatusOK,
-			expectedBody: "100.23",
+			expectedBody: "100.11",
 		},
 		{
 			name:         "positive get PollCount",
 			path:         "/value/counter/PollCount",
 			method:       http.MethodGet,
 			expectedCode: http.StatusOK,
-			expectedBody: "100",
+			expectedBody: "105",
 		},
 	}
-	storage, err := inmemory.New()
-	if err != nil {
-		panic(err)
-	}
-	metricsHandler := metrics.MetricHandler{
-		Storage: storage,
-	}
-	ts := httptest.NewServer(MetricsRouter(metricsHandler))
+
+	ts, mh := getServer()
 	defer ts.Close()
-	storage.DBCounter["PollCount"] = 100
-	storage.DBGauge["Alloc"] = 100.23
+
+	preSeed(mh.Storage)
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
 			resp, body := testRequest(t, ts, tt.method, tt.path, bytes.NewReader(nil), nil)
@@ -251,16 +235,10 @@ func TestAll(t *testing.T) {
 			expectedJSON: `[{"type":"gauge","id":"Alloc","value":100.11},{"id":"PollCount","delta":105,"type":"counter"}]`,
 		},
 	}
-	storage, err := inmemory.New()
-	if err != nil {
-		panic(err)
-	}
-	metricsHandler := metrics.MetricHandler{
-		Storage: storage,
-	}
-	ts := httptest.NewServer(MetricsRouter(metricsHandler))
+
+	ts, mh := getServer()
 	defer ts.Close()
-	preSeed(storage)
+	preSeed(mh.Storage)
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
 			resp, jsonBody := testRequest(t, ts, tt.method, tt.path, bytes.NewReader(nil), nil)
@@ -304,16 +282,10 @@ func TestGetByTypeAndNameJson(t *testing.T) {
 			expectedJSON: `{"id":"Alloc","type":"gauge","value":100.11}`,
 		},
 	}
-	storage, err := inmemory.New()
-	if err != nil {
-		panic(err)
-	}
-	metricsHandler := metrics.MetricHandler{
-		Storage: storage,
-	}
-	ts := httptest.NewServer(MetricsRouter(metricsHandler))
+
+	ts, mh := getServer()
 	defer ts.Close()
-	preSeed(storage)
+	preSeed(mh.Storage)
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
 			requestBody, err := json.Marshal(tt.metricReqBody)
@@ -332,16 +304,9 @@ func TestGetByTypeAndNameGZIP(t *testing.T) {
 	requestBody := `{"id":"PollCount","type":"counter"}`
 	successBody := `{"id":"PollCount","type":"counter","delta":105}`
 	path := "/value/"
-	storage, err := inmemory.New()
-	if err != nil {
-		panic(err)
-	}
-	metricsHandler := metrics.MetricHandler{
-		Storage: storage,
-	}
-	ts := httptest.NewServer(MetricsRouter(metricsHandler))
+	ts, mh := getServer()
 	defer ts.Close()
-	preSeed(storage)
+	preSeed(mh.Storage)
 
 	t.Run("send ByTypeAndName gzip", func(t *testing.T) {
 		buf := bytes.NewBuffer(nil)
@@ -378,7 +343,7 @@ func TestGetByTypeAndNameGZIP(t *testing.T) {
 
 	})
 }
-func preSeed(storage *inmemory.InMemory) {
+func preSeed(storage metrics.MetricStorage) {
 	seeds := []metric.Metrics{
 		{
 			ID:    "PollCount",
@@ -416,4 +381,18 @@ func testRequest(t *testing.T, ts *httptest.Server, method string, path string, 
 	respBody, err := io.ReadAll(resp.Body)
 	require.NoError(t, err)
 	return resp, string(respBody)
+}
+func getServer() (*httptest.Server, *metrics.MetricHandler) {
+	storage, err := inmemory.New()
+	if err != nil {
+		panic(err)
+	}
+	cfg := &config.Config{
+		StoreInterval:   1000,
+		FileStoragePath: `mytestfile.txt`,
+		Restore:         false,
+	}
+	fileStorage := filestorage.NewStorage(cfg.FileStoragePath)
+	metricsHandler := metrics.New(storage, fileStorage, cfg)
+	return httptest.NewServer(MetricsRouter(metricsHandler)), metricsHandler
 }
