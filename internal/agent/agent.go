@@ -19,7 +19,7 @@ import (
 )
 
 type MetricsCollector struct {
-	mx                  sync.RWMutex
+	mx                  sync.Mutex
 	GaugeMetrics        map[string]interface{}
 	PollInterval        int64
 	ReportCountInterval int64
@@ -73,8 +73,8 @@ func (m *MetricsCollector) UpdateMetrics() {
 }
 func (m *MetricsCollector) Send(url string) error {
 	op := "agent.Send"
-	m.mx.RLock()
-	defer m.mx.RUnlock()
+	m.mx.Lock()
+	defer m.mx.Unlock()
 	for key, val := range m.GaugeMetrics {
 		typedValue, err := convertToFloat64(val)
 		if err != nil {
