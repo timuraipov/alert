@@ -59,8 +59,8 @@ func (s *Server) ListenAndServe() error {
 		logger.Log.Info("get shutdown signal", zap.String("signal", signal.String()))
 
 		// Shutdown signal with grace period of 30 seconds
-		shutdownCtx, _ := context.WithTimeout(serverCtx, 30*time.Second)
-
+		shutdownCtx, cancelFunc := context.WithTimeout(serverCtx, 30*time.Second)
+		defer cancelFunc()
 		go func() {
 			<-shutdownCtx.Done()
 			if shutdownCtx.Err() == context.DeadlineExceeded {
