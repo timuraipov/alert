@@ -12,11 +12,13 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/timuraipov/alert/internal/config"
 	"github.com/timuraipov/alert/internal/filestorage"
+	"github.com/timuraipov/alert/internal/handlers/health"
 	"github.com/timuraipov/alert/internal/handlers/metrics"
 	"github.com/timuraipov/alert/internal/logger"
 	"github.com/timuraipov/alert/internal/middleware/gzip"
 	middlewareLogger "github.com/timuraipov/alert/internal/middleware/logger"
 	"github.com/timuraipov/alert/internal/storage/inmemory"
+	"github.com/timuraipov/alert/internal/storage/postgres"
 	"go.uber.org/zap"
 )
 
@@ -27,12 +29,15 @@ type Server struct {
 }
 
 func New(cfg *config.Config) *Server {
-
+	ctx := context.Background()
 	storage, _ := inmemory.New()
+	postgresStorage := postgres.Init(cfg.DatabaseDSN)
 	fileStorage := filestorage.NewStorage(cfg.FileStoragePath)
 
 	metricsHandler := metrics.New(storage, fileStorage, cfg)
+	healthHandler := health.New(postgresStorage)
 	r := MetricsRouter(metricsHandler)
+	r.Get("/ping", healthHandler.Ping(ctx))
 	return &Server{r: r, metricsHandler: metricsHandler, cfg: cfg}
 }
 func MetricsRouter(handler *metrics.MetricHandler) chi.Router {
