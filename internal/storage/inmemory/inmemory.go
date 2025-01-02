@@ -151,10 +151,12 @@ func (i *InMemory) GetByTypeAndName(metricType, metricName string) (metric.Metri
 func New(fileStorage *filestorage.Storage, cfg *config.Config) (*InMemory, error) {
 	dbGauge := make(map[string]float64)
 	dbCounter := make(map[string]int64)
-	return &InMemory{
+	storage := &InMemory{
 		DBGauge:     dbGauge,
 		DBCounter:   dbCounter,
 		fileStorage: fileStorage,
 		config:      cfg,
-	}, nil
+	}
+	storage.init()
+	return storage, nil
 }
