@@ -383,16 +383,17 @@ func testRequest(t *testing.T, ts *httptest.Server, method string, path string, 
 	return resp, string(respBody)
 }
 func getServer() (*httptest.Server, *metrics.MetricHandler) {
-	storage, err := inmemory.New()
-	if err != nil {
-		panic(err)
-	}
+
 	cfg := &config.Config{
 		StoreInterval:   1000,
 		FileStoragePath: `mytestfile.txt`,
 		Restore:         false,
 	}
 	fileStorage := filestorage.NewStorage(cfg.FileStoragePath)
-	metricsHandler := metrics.New(storage, fileStorage, cfg)
+	storage, err := inmemory.New(fileStorage, cfg)
+	if err != nil {
+		panic(err)
+	}
+	metricsHandler := metrics.New(storage)
 	return httptest.NewServer(MetricsRouter(metricsHandler)), metricsHandler
 }

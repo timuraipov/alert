@@ -30,11 +30,11 @@ type Server struct {
 
 func New(cfg *config.Config) *Server {
 	ctx := context.Background()
-	storage, _ := inmemory.New()
+
 	postgresStorage := postgres.Init(cfg.DatabaseDSN)
 	fileStorage := filestorage.NewStorage(cfg.FileStoragePath)
-
-	metricsHandler := metrics.New(storage, fileStorage, cfg)
+	storage, _ := inmemory.New(fileStorage, cfg)
+	metricsHandler := metrics.New(storage)
 	healthHandler := health.New(postgresStorage)
 	r := MetricsRouter(metricsHandler)
 	r.Get("/ping", healthHandler.Ping(ctx))

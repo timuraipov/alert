@@ -6,7 +6,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/timuraipov/alert/internal/common"
+	"github.com/timuraipov/alert/internal/config"
 	"github.com/timuraipov/alert/internal/domain/metric"
+	"github.com/timuraipov/alert/internal/filestorage"
 )
 
 func TestSaveGauge(t *testing.T) {
@@ -49,7 +51,8 @@ func TestSaveGauge(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		saver, err := New()
+
+		saver, err := getStorage()
 		assert.NoError(t, err)
 		var currentData metric.Metrics
 		t.Run(test.name, func(t *testing.T) {
@@ -108,7 +111,7 @@ func TestSaveCounter(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		saver, err := New()
+		saver, err := getStorage()
 		assert.NoError(t, err)
 		var currentData metric.Metrics
 		t.Run(test.name, func(t *testing.T) {
@@ -201,7 +204,7 @@ func TestGetAll(t *testing.T) {
 			found: false,
 		},
 	}
-	storage, err := New()
+	storage, err := getStorage()
 	if err != nil {
 		fmt.Print(err)
 	}
@@ -276,7 +279,7 @@ func TestGetByTypeAndName(t *testing.T) {
 			want:       0,
 		},
 	}
-	storage, err := New()
+	storage, err := getStorage()
 	if err != nil {
 		assert.NoError(t, err)
 	}
@@ -297,4 +300,15 @@ func TestGetByTypeAndName(t *testing.T) {
 			}
 		})
 	}
+}
+func getStorage() (*InMemory, error) {
+
+	cfg := &config.Config{
+		StoreInterval:   1000,
+		FileStoragePath: `mytestfile.txt`,
+		Restore:         false,
+	}
+	fileStorage := filestorage.NewStorage(cfg.FileStoragePath)
+	storage, err := New(fileStorage, cfg)
+	return storage, err
 }
