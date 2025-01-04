@@ -412,7 +412,10 @@ func preSeed(storage storage.DBStorage) {
 		},
 	}
 	for _, seed := range seeds {
-		storage.Save(context.Background(), seed)
+		_, err := storage.Save(context.Background(), seed)
+		if err != nil {
+			panic(err)
+		}
 	}
 }
 

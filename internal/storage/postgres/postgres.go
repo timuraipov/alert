@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"fmt"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/timuraipov/alert/internal/domain/metric"
@@ -42,7 +41,7 @@ func (db *DB) Bootstrap(ctx context.Context) error {
 						primary key,
 				name  varchar(100) not null,
 				type  varchar(50)  not null,
-				delta integer,
+				delta bigint,
 				value double precision,
 				constraint unique_metric
         unique (name, type)
@@ -95,7 +94,6 @@ func (db *DB) Save(ctx context.Context, m metric.Metrics) (metric.Metrics, error
 	}
 	row = tx.QueryRowContext(ctx, `select name,type,delta,value from metrics where name=$1 and type=$2`, m.ID, m.MType)
 	if err = row.Scan(&m.ID, &m.MType, &m.Delta, &m.Value); err != nil {
-		fmt.Println(err)
 		return metric.Metrics{}, err
 	}
 	err = tx.Commit()

@@ -75,6 +75,7 @@ func (m *MetricsCollector) Send(url string) error {
 	op := "agent.Send"
 	m.mx.Lock()
 	defer m.mx.Unlock()
+	var metrics []metric.Metrics
 	for key, val := range m.GaugeMetrics {
 		typedValue, err := convertToFloat64(val)
 		if err != nil {
@@ -89,14 +90,15 @@ func (m *MetricsCollector) Send(url string) error {
 			MType: metric.MetricTypeGauge,
 			Value: &typedValue,
 		}
-		err = m.sendMetric(url, metric)
-		if err != nil {
-			logger.Log.Error("failed to  send metrics",
-				zap.String("operation", op),
-				zap.Error(err),
-			)
-			return err
-		}
+		metrics = append(metrics, metric)
+		// err = m.sendMetric(url, metric)
+		// if err != nil {
+		// 	logger.Log.Error("failed to  send metrics",
+		// 		zap.String("operation", op),
+		// 		zap.Error(err),
+		// 	)
+		// 	return err
+		// }
 	}
 	//send PollCount
 
@@ -105,14 +107,16 @@ func (m *MetricsCollector) Send(url string) error {
 		MType: metric.MetricTypeCounter,
 		Delta: &m.PollCount,
 	}
-	err := m.sendMetric(url, metric)
+
+	metrics = append(metrics, metric)
+	err := m.sendMetric(url, metrics)
 	if err != nil {
 		return err
 	}
 	m.PollCount = 0
 	return nil
 }
-func (m *MetricsCollector) sendMetric(url string, metricObj metric.Metrics) error {
+func (m *MetricsCollector) sendMetric(url string, metricObj []metric.Metrics) error {
 	requestBody, err := json.Marshal(metricObj)
 	if err != nil {
 		log.Print(err)
@@ -142,7 +146,7 @@ func (m *MetricsCollector) Run() {
 	}()
 	time.Sleep(time.Duration(m.ReportCountInterval) * time.Second)
 	for {
-		err := m.Send("http://" + m.Addr + "/update/")
+		err := m.Send("http://" + m.Addr + "/updates/")
 		if err != nil {
 			logger.Log.Error("failed to Marshal body",
 				zap.String("operation", op),

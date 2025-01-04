@@ -62,6 +62,7 @@ func (mh *MetricHandler) GetByNameJSON(w http.ResponseWriter, r *http.Request) {
 	var metrics metric.Metrics
 	var buf bytes.Buffer
 	_, err := buf.ReadFrom(r.Body)
+
 	if err != nil {
 
 		logger.Log.Error("failed to read incoming message",
@@ -73,7 +74,8 @@ func (mh *MetricHandler) GetByNameJSON(w http.ResponseWriter, r *http.Request) {
 		zap.String("operation", op),
 		zap.String("requestBody", buf.String()),
 	)
-	if err := json.Unmarshal(buf.Bytes(), &metrics); err != nil {
+	tmp := buf.Bytes() //TODO return back
+	if err := json.Unmarshal(tmp, &metrics); err != nil {
 		logger.Log.Error("failed to Unmarshal body",
 			zap.String("operation", op),
 			zap.Error(err),
@@ -81,6 +83,7 @@ func (mh *MetricHandler) GetByNameJSON(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
+	logger.Log.Info("/value/ body", zap.String("body", string(tmp)))
 	val, err := mh.Storage.GetByTypeAndName(r.Context(), metrics.MType, metrics.ID)
 	if err != nil {
 		if errors.Is(err, storage.ErrMetricNotFound) {
@@ -231,14 +234,12 @@ func parseAndValidate(metricType, metricName string, value string) (*metric.Metr
 	case metric.MetricTypeCounter:
 		val, err := strconv.ParseInt(value, 10, 64)
 		if err != nil {
-			fmt.Println("int64 mismatch", "-", value, "-")
 			return nil, ErrMetricTypeIsEnum
 		}
 		metricObj.Delta = &val
 	case metric.MetricTypeGauge:
 		val, err := strconv.ParseFloat(value, 64)
 		if err != nil {
-			fmt.Printf("float64 mismatch")
 			return nil, ErrMetricTypeIsEnum
 		}
 		metricObj.Value = &val
@@ -266,7 +267,9 @@ func (mh *MetricHandler) UpdateJSONBatch(w http.ResponseWriter, r *http.Request)
 		zap.String("operation", op),
 		zap.String("requestBody", buf.String()),
 	)
-	if err := json.Unmarshal(buf.Bytes(), &myMetrics); err != nil {
+	tmp := buf.Bytes()
+	logger.Log.Info("/updates/ body", zap.String("BATCH body", string(tmp)))
+	if err := json.Unmarshal(tmp, &myMetrics); err != nil {
 		logger.Log.Error("failed to Unmarshal body",
 			zap.String("operation", op),
 			zap.Error(err),
@@ -274,6 +277,7 @@ func (mh *MetricHandler) UpdateJSONBatch(w http.ResponseWriter, r *http.Request)
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
+
 	for _, m := range myMetrics {
 		err = parseAndValidateJSON(m)
 		if err != nil {

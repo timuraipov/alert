@@ -184,7 +184,8 @@ func TestFileStorage(t *testing.T) {
 	}
 	storage, err := getStorage(cfg)
 	assert.NoError(t, err)
-	storage.save(seed)
+	_, err = storage.save(seed)
+	assert.NoError(t, err)
 	newCfg := &config.Config{
 		StoreInterval:   0,
 		FileStoragePath: file.Name(),
@@ -235,7 +236,10 @@ func Seed(storage *InMemory) {
 	}
 
 	for _, seed := range seeds {
-		storage.Save(context.Background(), seed)
+		_, err := storage.Save(context.Background(), seed)
+		if err != nil {
+			panic(err)
+		}
 	}
 }
 func TestGetAll(t *testing.T) {
@@ -291,9 +295,7 @@ func TestGetAll(t *testing.T) {
 		},
 	}
 	storage, err := getStorage(nil)
-	if err != nil {
-		fmt.Print(err)
-	}
+	assert.NoError(t, err)
 	Seed(storage)
 	contains := func(slice []metric.Metrics, value metric.Metrics) bool {
 		for _, elem := range slice {
