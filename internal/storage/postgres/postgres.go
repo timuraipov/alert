@@ -28,8 +28,8 @@ func New(dsn string) *DB {
 func (db *DB) Ping(ctx context.Context) error {
 	return db.conn.PingContext(ctx)
 }
-func (i *DB) Bootstrap(ctx context.Context) error {
-	tx, err := i.conn.BeginTx(ctx, nil)
+func (db *DB) Bootstrap(ctx context.Context) error {
+	tx, err := db.conn.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
@@ -54,8 +54,8 @@ func (i *DB) Bootstrap(ctx context.Context) error {
 	return tx.Commit()
 }
 
-func (i *DB) Save(ctx context.Context, m metric.Metrics) (metric.Metrics, error) {
-	tx, err := i.conn.BeginTx(ctx, nil)
+func (db *DB) Save(ctx context.Context, m metric.Metrics) (metric.Metrics, error) {
+	tx, err := db.conn.BeginTx(ctx, nil)
 	if err != nil {
 		return metric.Metrics{}, err
 	}
@@ -76,7 +76,10 @@ func (i *DB) Save(ctx context.Context, m metric.Metrics) (metric.Metrics, error)
 		if err != nil {
 			return metric.Metrics{}, err
 		}
-		tx.Commit()
+		err := tx.Commit()
+		if err != nil {
+			return metric.Metrics{}, err
+		}
 		return m, nil
 	}
 	if m.MType == metric.MetricTypeGauge {
@@ -95,11 +98,14 @@ func (i *DB) Save(ctx context.Context, m metric.Metrics) (metric.Metrics, error)
 		fmt.Println(err)
 		return metric.Metrics{}, err
 	}
-	tx.Commit()
+	err = tx.Commit()
+	if err != nil {
+		return metric.Metrics{}, err
+	}
 	return m, err
 }
-func (i *DB) GetAll(ctx context.Context) ([]metric.Metrics, error) {
-	rows, err := i.conn.QueryContext(ctx, `
+func (db *DB) GetAll(ctx context.Context) ([]metric.Metrics, error) {
+	rows, err := db.conn.QueryContext(ctx, `
 		select name, type, delta, value from metrics;
 	`)
 	if err != nil {
@@ -116,8 +122,8 @@ func (i *DB) GetAll(ctx context.Context) ([]metric.Metrics, error) {
 	}
 	return metrics, nil
 }
-func (i *DB) GetByTypeAndName(ctx context.Context, metricType, metricName string) (metric.Metrics, error) {
-	row := i.conn.QueryRowContext(ctx, `
+func (db *DB) GetByTypeAndName(ctx context.Context, metricType, metricName string) (metric.Metrics, error) {
+	row := db.conn.QueryRowContext(ctx, `
 		select name, type, delta, value from metrics where name = $1 and type = $2
 	`, metricName, metricType)
 	var m metric.Metrics
@@ -131,11 +137,11 @@ func (i *DB) GetByTypeAndName(ctx context.Context, metricType, metricName string
 	return m, nil
 }
 
-func (i *DB) Flush() error {
+func (db *DB) Flush() error {
 	return nil
 }
-func (i *DB) SaveBatch(ctx context.Context, metrics []metric.Metrics) error {
-	tx, err := i.conn.BeginTx(ctx, nil)
+func (db *DB) SaveBatch(ctx context.Context, metrics []metric.Metrics) error {
+	tx, err := db.conn.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}

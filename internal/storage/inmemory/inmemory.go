@@ -24,9 +24,12 @@ type InMemory struct {
 	IsNeedSyncFlush bool
 }
 
-func (i *InMemory) init() {
+func (i *InMemory) init() error {
 	if i.config.Restore {
-		i.load()
+		err := i.load()
+		if err != nil {
+			return err
+		}
 	}
 	if i.config.StoreInterval == 0 {
 		i.IsNeedSyncFlush = true
@@ -45,6 +48,7 @@ func (i *InMemory) init() {
 			}
 		}()
 	}
+	return nil
 }
 func (i *InMemory) Flush() error {
 	logger.Log.Debug(
@@ -143,7 +147,10 @@ func New(fileStorage *filestorage.Storage, cfg *config.Config) (*InMemory, error
 		fileStorage: fileStorage,
 		config:      cfg,
 	}
-	storage.init()
+	err := storage.init()
+	if err != nil {
+		return nil, err
+	}
 	return storage, nil
 }
 func (i *InMemory) SaveBatch(ctx context.Context, metrics []metric.Metrics) error {
@@ -186,6 +193,6 @@ func (i *InMemory) save(metricsList []metric.Metrics) ([]metric.Metrics, error) 
 	}
 	return resultList, nil
 }
-func (db *InMemory) Ping(ctx context.Context) error {
+func (i *InMemory) Ping(ctx context.Context) error {
 	return nil
 }
