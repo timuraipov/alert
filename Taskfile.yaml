@@ -1,0 +1,40 @@
+version: '3'
+tasks:
+  app:
+    desc: 'run application'
+    cmds:
+      - go run cmd/server/main.go
+  linter:
+    desc: 'run linter'
+    cmds:
+      - golangci-lint run
+  test:
+    desc: 'run test ./...'
+    cmds:
+      - 'go test ./... -count=1'
+  build:
+    desc: 'build agent & server'
+    cmds:
+      - 'go build -o ./cmd/server/server ./cmd/server/*.go'
+      - 'go build -o ./cmd/agent/agent ./cmd/agent/*.go'
+  test-ci:
+    desc: 'run tests from ci'
+    vars:
+      SERVER_PORT: 8080
+      TEMP_FILE: metrics_file.txt
+      ITER: 12
+    cmds:
+      - |
+        SERVER_PORT={{.SERVER_PORT}}
+        ADDRESS="localhost:${SERVER_PORT}"
+        TEMP_FILE="{{.TEMP_FILE}}"
+        metricstest -test.v -test.run=^TestIteration{{.ITER}}$ \
+        -agent-binary-path=cmd/agent/agent \
+        -binary-path=cmd/server/server \
+        -database-dsn="postgres://metric:XXXXX@localhost:5432/metric?sslmode=disable" \
+        -server-port=$SERVER_PORT \
+        -source-path=.
+  set-export-path:
+    desc: 'add metrictest to PATH'
+    cmds:
+      - 'export PATH=$PATH:/Users/timur/golang/praktikum'
