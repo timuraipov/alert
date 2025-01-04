@@ -25,10 +25,14 @@ type InMemory struct {
 }
 
 func (i *InMemory) init() error {
+	op := "Inmemory.init"
 	if i.config.Restore {
 		err := i.load()
 		if err != nil {
-			return err
+			logger.Log.Error("can't load file",
+				zap.String("operation", op),
+				zap.Error(err),
+			)
 		}
 	}
 	if i.config.StoreInterval == 0 {
