@@ -120,6 +120,10 @@ func (db *DB) GetAll(ctx context.Context) ([]metric.Metrics, error) {
 		}
 		metrics = append(metrics, m)
 	}
+	err = rows.Err()
+	if err != nil {
+		return nil, err
+	}
 	return metrics, nil
 }
 func (db *DB) GetByTypeAndName(ctx context.Context, metricType, metricName string) (metric.Metrics, error) {
