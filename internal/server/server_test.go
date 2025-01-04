@@ -3,6 +3,7 @@ package server
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -17,6 +18,7 @@ import (
 	"github.com/timuraipov/alert/internal/domain/metric"
 	"github.com/timuraipov/alert/internal/filestorage"
 	"github.com/timuraipov/alert/internal/handlers/metrics"
+	"github.com/timuraipov/alert/internal/storage"
 	"github.com/timuraipov/alert/internal/storage/inmemory"
 )
 
@@ -299,7 +301,55 @@ func TestGetByTypeAndNameJson(t *testing.T) {
 		})
 	}
 }
+func TestUpdates(t *testing.T) {
+	testCase := []metric.Metrics{
+		{
+			ID:    "PollCount",
+			MType: "counter",
+			Delta: common.Pointer(int64(100)),
+		},
+		{
+			ID:    "PollCount",
+			MType: "counter",
+			Delta: common.Pointer(int64(5)),
+		},
+		{
+			ID:    "Alloc",
+			MType: "gauge",
+			Value: common.Pointer(100.11),
+		},
+	}
+	tests := []struct {
+		name         string
+		testCase     []metric.Metrics
+		expectedCode int
+		method       string
+		path         string
+	}{
+		{
+			name:         "positive batch",
+			testCase:     testCase,
+			expectedCode: http.StatusOK,
+			method:       http.MethodPost,
+			path:         "/updates/",
+		},
+	}
 
+	ts, _ := getServer()
+	defer ts.Close()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			requestBody, err := json.Marshal(tt.testCase)
+			assert.NoError(t, err)
+			resp, _ := testRequest(t, ts, tt.method, tt.path, bytes.NewReader(requestBody), nil)
+			assert.NoError(t, err)
+			resp.Body.Close()
+			assert.Equal(t, tt.expectedCode, resp.StatusCode)
+
+		})
+	}
+
+}
 func TestGetByTypeAndNameGZIP(t *testing.T) {
 	requestBody := `{"id":"PollCount","type":"counter"}`
 	successBody := `{"id":"PollCount","type":"counter","delta":105}`
@@ -343,7 +393,7 @@ func TestGetByTypeAndNameGZIP(t *testing.T) {
 
 	})
 }
-func preSeed(storage metrics.MetricStorage) {
+func preSeed(storage storage.DBStorage) {
 	seeds := []metric.Metrics{
 		{
 			ID:    "PollCount",
@@ -362,7 +412,7 @@ func preSeed(storage metrics.MetricStorage) {
 		},
 	}
 	for _, seed := range seeds {
-		storage.Save(seed)
+		storage.Save(context.Background(), seed)
 	}
 }
 

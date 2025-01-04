@@ -29,15 +29,28 @@ type Server struct {
 }
 
 func New(cfg *config.Config) *Server {
+	var (
+		metricsHandler *metrics.MetricHandler
+		healthHandler  *health.Health
+	)
 	ctx := context.Background()
+	if len(cfg.DatabaseDSN) > 0 {
+		postgresStorage := postgres.New(cfg.DatabaseDSN)
+		if err := postgresStorage.Bootstrap(ctx); err != nil {
+			logger.Log.Fatal("error while bootstrap table", zap.Error(err))
+		}
 
-	postgresStorage := postgres.Init(cfg.DatabaseDSN)
-	fileStorage := filestorage.NewStorage(cfg.FileStoragePath)
-	storage, _ := inmemory.New(fileStorage, cfg)
-	metricsHandler := metrics.New(storage)
-	healthHandler := health.New(postgresStorage)
+		metricsHandler = metrics.New(postgresStorage)
+		healthHandler = health.New(postgresStorage)
+	} else {
+		fileStorage := filestorage.NewStorage(cfg.FileStoragePath)
+		storage, _ := inmemory.New(fileStorage, cfg)
+		metricsHandler = metrics.New(storage)
+		healthHandler = health.New(storage)
+	}
+
 	r := MetricsRouter(metricsHandler)
-	r.Get("/ping", healthHandler.Ping(ctx))
+	r.Get("/ping", healthHandler.Ping)
 	return &Server{r: r, metricsHandler: metricsHandler, cfg: cfg}
 }
 func MetricsRouter(handler *metrics.MetricHandler) chi.Router {
@@ -47,6 +60,7 @@ func MetricsRouter(handler *metrics.MetricHandler) chi.Router {
 	r.Post("/update/", handler.UpdateJSON)
 	r.Post("/update/{type}/{name}/{val}", handler.Update)
 	r.Post("/value/", handler.GetByNameJSON)
+	r.Post("/updates/", handler.UpdateJSONBatch)
 	r.Get("/value/{type}/{name}", handler.GetByName)
 	r.Get("/", handler.GetAll)
 	return r

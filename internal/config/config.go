@@ -23,10 +23,11 @@ func MustLoad() (*Config, error) {
 	flag.Int64Var(&cfg.StoreInterval, "i", 300, "time for flush to disk")
 	flag.StringVar(&cfg.FileStoragePath, "f", "metrics_file.txt", "file name for flush to disk")
 	flag.BoolVar(&cfg.Restore, "r", true, "flag to indicate if need to load metrics from file")
-	flag.StringVar(&cfg.DatabaseDSN, "d", fmt.Sprintf("host=%s user=%s password=%s dbname=%s sslmode=disable",
-		`localhost`, `video`, `XXXXX`, `video`), "database connection URL")
+	flag.StringVar(&cfg.DatabaseDSN, "d", "", "database connection URL")
+	//fmt.Sprintf("host=%s user=%s password=%s dbname=%s sslmode=disable",
+	//	`localhost`, `metric`, `XXXXX`, `metric`)
 	flag.Parse()
 	err := env.Parse(cfg)
-
+	fmt.Println("config", cfg)
 	return cfg, err
 }

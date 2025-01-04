@@ -1,7 +1,13 @@
 package inmemory
 
 import (
+	"cmp"
+	"context"
+	"encoding/json"
 	"fmt"
+	"os"
+	"slices"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -9,6 +15,7 @@ import (
 	"github.com/timuraipov/alert/internal/config"
 	"github.com/timuraipov/alert/internal/domain/metric"
 	"github.com/timuraipov/alert/internal/filestorage"
+	commonStorage "github.com/timuraipov/alert/internal/storage"
 )
 
 func TestSaveGauge(t *testing.T) {
@@ -52,12 +59,12 @@ func TestSaveGauge(t *testing.T) {
 
 	for _, test := range tests {
 
-		saver, err := getStorage()
+		saver, err := getStorage(nil)
 		assert.NoError(t, err)
 		var currentData metric.Metrics
 		t.Run(test.name, func(t *testing.T) {
 			for _, metric := range test.metrics {
-				currentData, err = saver.Save(metric)
+				currentData, err = saver.Save(context.Background(), metric)
 				assert.NoError(t, err)
 			}
 
@@ -111,18 +118,96 @@ func TestSaveCounter(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		saver, err := getStorage()
+		saver, err := getStorage(nil)
 		assert.NoError(t, err)
 		var currentData metric.Metrics
 		t.Run(test.name, func(t *testing.T) {
 			for _, metric := range test.metrics {
-				currentData, err = saver.Save(metric)
+				currentData, err = saver.Save(context.Background(), metric)
 				assert.NoError(t, err)
 			}
 
 			assert.Equal(t, test.want, *(currentData.Delta))
 		})
 	}
+}
+
+func TestFileStorage(t *testing.T) {
+	seed := []metric.Metrics{
+		{
+			MType: metric.MetricTypeCounter,
+			ID:    "counterKey",
+			Delta: common.Pointer(int64(50)),
+		},
+		{
+			MType: metric.MetricTypeCounter,
+			ID:    "counterKey",
+			Delta: common.Pointer(int64(1)),
+		},
+
+		{
+			MType: metric.MetricTypeGauge,
+			ID:    "gaugeKey",
+			Value: common.Pointer(2.01),
+		},
+		{
+			MType: metric.MetricTypeGauge,
+			ID:    "gaugeKey2",
+			Value: common.Pointer(1000.001),
+		},
+	}
+	tests := []struct {
+		name  string
+		want  string
+		found bool
+	}{
+		{
+			name: "positive load test",
+			want: `[  {"id": "counterKey",
+        "type": "counter",
+        "delta": 51}, {"id": "gaugeKey",
+        "type": "gauge",
+        "value": 2.01}, {"id": "gaugeKey2",
+        "type": "gauge",
+        "value": 1000.001}]`,
+			found: true,
+		},
+	}
+	file, err := os.CreateTemp("", "temp")
+	assert.NoError(t, err)
+	defer os.Remove(file.Name())
+	assert.NoError(t, err)
+	cfg := &config.Config{
+		StoreInterval:   0,
+		FileStoragePath: file.Name(),
+		Restore:         false,
+	}
+	storage, err := getStorage(cfg)
+	assert.NoError(t, err)
+	storage.save(seed)
+	newCfg := &config.Config{
+		StoreInterval:   0,
+		FileStoragePath: file.Name(),
+		Restore:         true,
+	}
+	newStorage, err := getStorage(newCfg)
+	assert.NoError(t, err)
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			metrics, err := newStorage.GetAll(context.Background())
+			slices.SortFunc(metrics, func(a, b metric.Metrics) int {
+				if n := strings.Compare(a.ID, b.ID); n != 0 {
+					return n
+				}
+				return cmp.Compare[string](a.MType, b.MType)
+			})
+			assert.NoError(t, err)
+			jsonMetrics, err := json.Marshal(metrics)
+			assert.NoError(t, err)
+			assert.JSONEqf(t, fmt.Sprint(test.want), fmt.Sprint(string(jsonMetrics)), "error message %s", "formatted")
+		})
+	}
+
 }
 func Seed(storage *InMemory) {
 	seeds := []metric.Metrics{
@@ -148,8 +233,9 @@ func Seed(storage *InMemory) {
 			Value: common.Pointer(1000.001),
 		},
 	}
+
 	for _, seed := range seeds {
-		storage.Save(seed)
+		storage.Save(context.Background(), seed)
 	}
 }
 func TestGetAll(t *testing.T) {
@@ -204,7 +290,7 @@ func TestGetAll(t *testing.T) {
 			found: false,
 		},
 	}
-	storage, err := getStorage()
+	storage, err := getStorage(nil)
 	if err != nil {
 		fmt.Print(err)
 	}
@@ -227,7 +313,8 @@ func TestGetAll(t *testing.T) {
 		}
 		return false
 	}
-	resMetrics := storage.GetAll()
+	resMetrics, err := storage.GetAll(context.Background())
+	assert.NoError(t, err)
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			assert.Equal(t, test.found, contains(resMetrics, test.want))
@@ -279,16 +366,16 @@ func TestGetByTypeAndName(t *testing.T) {
 			want:       0,
 		},
 	}
-	storage, err := getStorage()
+	storage, err := getStorage(nil)
 	if err != nil {
 		assert.NoError(t, err)
 	}
 	Seed(storage)
 	for _, test := range tests {
 		t.Run(test.testName, func(t *testing.T) {
-			resMetric, found := storage.GetByTypeAndName(test.metricType, test.metricName)
-			assert.Equal(t, test.found, found)
+			resMetric, err := storage.GetByTypeAndName(context.Background(), test.metricType, test.metricName)
 			if test.found {
+				assert.NoError(t, err)
 				switch test.metricType {
 				case metric.MetricTypeGauge:
 					assert.Equal(t, test.want, *(resMetric.Value))
@@ -297,16 +384,21 @@ func TestGetByTypeAndName(t *testing.T) {
 				default:
 					t.Errorf("unknown Mtype:%s", resMetric.MType)
 				}
+			} else {
+				assert.ErrorIs(t, err, commonStorage.ErrMetricNotFound)
 			}
 		})
 	}
 }
-func getStorage() (*InMemory, error) {
+func getStorage(configMap *config.Config) (*InMemory, error) {
 
 	cfg := &config.Config{
 		StoreInterval:   1000,
 		FileStoragePath: `mytestfile.txt`,
 		Restore:         false,
+	}
+	if configMap != nil {
+		cfg = configMap
 	}
 	fileStorage := filestorage.NewStorage(cfg.FileStoragePath)
 	storage, err := New(fileStorage, cfg)

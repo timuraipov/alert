@@ -11,20 +11,15 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/timuraipov/alert/internal/domain/metric"
 	"github.com/timuraipov/alert/internal/logger"
+	"github.com/timuraipov/alert/internal/storage"
 	"go.uber.org/zap"
 )
 
-type MetricStorage interface {
-	Save(metric metric.Metrics) (metric.Metrics, error)
-	GetAll() []metric.Metrics
-	GetByTypeAndName(metricType, metricName string) (metric.Metrics, bool)
-	Flush() error
-}
 type MetricHandler struct {
-	Storage MetricStorage
+	Storage storage.DBStorage
 }
 
-func New(storage MetricStorage) *MetricHandler {
+func New(storage storage.DBStorage) *MetricHandler {
 	metricsHandler := &MetricHandler{
 		Storage: storage,
 	}
@@ -41,7 +36,15 @@ var (
 
 func (mh *MetricHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	op := "handlers.metrics.GetAll"
-	metrics := mh.Storage.GetAll()
+	metrics, err := mh.Storage.GetAll(r.Context())
+	if err != nil {
+		logger.Log.Error("failed to get metrics",
+			zap.String("operation", op),
+			zap.Error(err),
+		)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
 	responseData, err := json.Marshal(metrics)
 	if err != nil {
 		logger.Log.Error("failed to Marshal body",
@@ -78,9 +81,14 @@ func (mh *MetricHandler) GetByNameJSON(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	val, ok := mh.Storage.GetByTypeAndName(metrics.MType, metrics.ID)
-	if !ok {
-		w.WriteHeader(http.StatusNotFound)
+	val, err := mh.Storage.GetByTypeAndName(r.Context(), metrics.MType, metrics.ID)
+	if err != nil {
+		if errors.Is(err, storage.ErrMetricNotFound) {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		w.WriteHeader(http.StatusInternalServerError)
+		return
 	} else {
 		metrics.Delta = val.Delta
 		metrics.Value = val.Value
@@ -99,9 +107,14 @@ func (mh *MetricHandler) GetByNameJSON(w http.ResponseWriter, r *http.Request) {
 func (mh *MetricHandler) GetByName(w http.ResponseWriter, r *http.Request) {
 	name := chi.URLParam(r, "name")
 	metricType := chi.URLParam(r, "type")
-	val, ok := mh.Storage.GetByTypeAndName(metricType, name)
-	if !ok {
-		w.WriteHeader(http.StatusNotFound)
+	val, err := mh.Storage.GetByTypeAndName(r.Context(), metricType, name)
+	if err != nil {
+		if errors.Is(err, storage.ErrMetricNotFound) {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		w.WriteHeader(http.StatusInternalServerError)
+		return
 	} else {
 		w.WriteHeader(http.StatusOK)
 		if val.MType == metric.MetricTypeCounter {
@@ -116,7 +129,7 @@ func (mh *MetricHandler) GetByName(w http.ResponseWriter, r *http.Request) {
 }
 
 func (mh *MetricHandler) UpdateJSON(w http.ResponseWriter, r *http.Request) {
-	op := "handlers.metrics.Update"
+	op := "handlers.metrics.UpdateJSON"
 	var myMetrics metric.Metrics
 	var buf bytes.Buffer
 	_, err := buf.ReadFrom(r.Body)
@@ -149,8 +162,11 @@ func (mh *MetricHandler) UpdateJSON(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	responseObj, err := mh.Storage.Save(myMetrics)
+	responseObj, err := mh.Storage.Save(r.Context(), myMetrics)
 	if err != nil {
+		logger.Log.Error(" exception",
+			zap.String("operation", op),
+			zap.Error(err))
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -177,6 +193,7 @@ func parseAndValidateJSON(metrics metric.Metrics) error {
 	return nil
 }
 func (mh *MetricHandler) Update(w http.ResponseWriter, r *http.Request) {
+	op := "handlers.metrics.Update"
 	metricType := chi.URLParam(r, "type")
 	metricName := chi.URLParam(r, "name")
 	metricValue := chi.URLParam(r, "val")
@@ -189,8 +206,12 @@ func (mh *MetricHandler) Update(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	_, err = mh.Storage.Save(*metric)
+	_, err = mh.Storage.Save(r.Context(), *metric)
+
 	if err != nil {
+		logger.Log.Error(" exception",
+			zap.String("operation", op),
+			zap.Error(err))
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -227,4 +248,51 @@ func parseAndValidate(metricType, metricName string, value string) (*metric.Metr
 
 	metricObj.ID = metricName
 	return metricObj, nil
+}
+func (mh *MetricHandler) UpdateJSONBatch(w http.ResponseWriter, r *http.Request) {
+	op := "handlers.metrics.UpdateJSONBatch"
+	var myMetrics []metric.Metrics
+	var buf bytes.Buffer
+	_, err := buf.ReadFrom(r.Body)
+	if err != nil {
+		logger.Log.Error("failed to read incoming message",
+			zap.String("operation", op),
+			zap.Error(err),
+		)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	logger.Log.Debug("get request body",
+		zap.String("operation", op),
+		zap.String("requestBody", buf.String()),
+	)
+	if err := json.Unmarshal(buf.Bytes(), &myMetrics); err != nil {
+		logger.Log.Error("failed to Unmarshal body",
+			zap.String("operation", op),
+			zap.Error(err),
+		)
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	for _, m := range myMetrics {
+		err = parseAndValidateJSON(m)
+		if err != nil {
+			if errors.Is(err, ErrMetricNameRequired) {
+				w.WriteHeader(http.StatusNotFound)
+				return
+			}
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+	}
+	err = mh.Storage.SaveBatch(r.Context(), myMetrics)
+	if err != nil {
+		logger.Log.Error("exception",
+			zap.String("operation", op),
+			zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
 }

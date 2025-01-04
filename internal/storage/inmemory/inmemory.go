@@ -1,6 +1,7 @@
 package inmemory
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"sync"
@@ -10,6 +11,7 @@ import (
 	"github.com/timuraipov/alert/internal/domain/metric"
 	"github.com/timuraipov/alert/internal/filestorage"
 	"github.com/timuraipov/alert/internal/logger"
+	"github.com/timuraipov/alert/internal/storage"
 	"go.uber.org/zap"
 )
 
@@ -48,7 +50,10 @@ func (i *InMemory) Flush() error {
 	logger.Log.Debug(
 		"called flush to disk method", zap.String("op", "op"),
 	)
-	metrics := i.GetAll()
+	metrics, err := i.GetAll(context.Background())
+	if err != nil {
+		return err
+	}
 	if len(metrics) > 0 {
 		data, err := json.Marshal(metrics)
 		if err != nil {
@@ -72,7 +77,7 @@ func (i *InMemory) load() error {
 		return fmt.Errorf("failed to load file %w", err)
 	}
 	for _, parsedMetric := range metrics {
-		_, err = i.Save(parsedMetric)
+		_, err = i.Save(context.Background(), parsedMetric)
 		if err != nil {
 			logger.Log.Error("failed to save metric", zap.Error(err))
 		}
@@ -80,33 +85,14 @@ func (i *InMemory) load() error {
 	return nil
 }
 
-func (i *InMemory) Save(metricObj metric.Metrics) (metric.Metrics, error) {
-	i.mx.Lock()
-	defer i.mx.Unlock()
-	responseMetric := metric.Metrics{}
-	switch metricObj.MType {
-	case metric.MetricTypeCounter:
-		i.DBCounter[metricObj.ID] += *metricObj.Delta
-		val := i.DBCounter[metricObj.ID]
-		responseMetric.Delta = &val
-	case metric.MetricTypeGauge:
-		i.DBGauge[metricObj.ID] = *metricObj.Value
-		val := i.DBGauge[metricObj.ID]
-		responseMetric.Value = &val
-	default:
-		return metric.Metrics{}, fmt.Errorf("incorrect type or value")
+func (i *InMemory) Save(ctx context.Context, metricObj metric.Metrics) (metric.Metrics, error) {
+	responseList, err := i.save([]metric.Metrics{metricObj})
+	if err != nil {
+		return metric.Metrics{}, err
 	}
-	responseMetric.ID = metricObj.ID
-	responseMetric.MType = metricObj.MType
-	if i.IsNeedSyncFlush {
-		err := i.Flush()
-		if err != nil {
-			logger.Log.Error("can't flush metrics on disk", zap.Error(err))
-		}
-	}
-	return responseMetric, nil
+	return responseList[0], nil
 }
-func (i *InMemory) GetAll() []metric.Metrics {
+func (i *InMemory) GetAll(ctx context.Context) ([]metric.Metrics, error) {
 	i.mx.RLock()
 	defer i.mx.RUnlock()
 	var metrics []metric.Metrics
@@ -124,9 +110,9 @@ func (i *InMemory) GetAll() []metric.Metrics {
 			Delta: &val,
 		})
 	}
-	return metrics
+	return metrics, nil
 }
-func (i *InMemory) GetByTypeAndName(metricType, metricName string) (metric.Metrics, bool) {
+func (i *InMemory) GetByTypeAndName(ctx context.Context, metricType, metricName string) (metric.Metrics, error) {
 	i.mx.RLock()
 	defer i.mx.RUnlock()
 	var foundMetrics metric.Metrics
@@ -136,17 +122,17 @@ func (i *InMemory) GetByTypeAndName(metricType, metricName string) (metric.Metri
 		val, ok := i.DBCounter[metricName]
 		if ok {
 			foundMetrics.Delta = &val
-			return foundMetrics, ok
+			return foundMetrics, nil
 		}
 	}
 	if metricType == metric.MetricTypeGauge {
 		val, ok := i.DBGauge[metricName]
 		if ok {
 			foundMetrics.Value = &val
-			return foundMetrics, ok
+			return foundMetrics, nil
 		}
 	}
-	return metric.Metrics{}, false
+	return metric.Metrics{}, storage.ErrMetricNotFound
 }
 func New(fileStorage *filestorage.Storage, cfg *config.Config) (*InMemory, error) {
 	dbGauge := make(map[string]float64)
@@ -159,4 +145,47 @@ func New(fileStorage *filestorage.Storage, cfg *config.Config) (*InMemory, error
 	}
 	storage.init()
 	return storage, nil
+}
+func (i *InMemory) SaveBatch(ctx context.Context, metrics []metric.Metrics) error {
+	_, err := i.save(metrics)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (i *InMemory) save(metricsList []metric.Metrics) ([]metric.Metrics, error) {
+	var resultList []metric.Metrics
+	i.mx.RLock()
+	defer i.mx.RUnlock()
+	for _, m := range metricsList {
+		responseMetric := metric.Metrics{}
+
+		switch m.MType {
+		case metric.MetricTypeCounter:
+			i.DBCounter[m.ID] += *m.Delta
+			val := i.DBCounter[m.ID]
+			responseMetric.Delta = &val
+		case metric.MetricTypeGauge:
+			i.DBGauge[m.ID] = *m.Value
+			val := i.DBGauge[m.ID]
+			responseMetric.Value = &val
+		default:
+			return nil, fmt.Errorf("incorrect type or value")
+		}
+		responseMetric.ID = m.ID
+		responseMetric.MType = m.MType
+		resultList = append(resultList, responseMetric)
+	}
+
+	if i.IsNeedSyncFlush { // maybe need to move into loop
+		err := i.Flush()
+		if err != nil {
+			logger.Log.Error("can't flush metrics on disk", zap.Error(err))
+		}
+	}
+	return resultList, nil
+}
+func (db *InMemory) Ping(ctx context.Context) error {
+	return nil
 }
