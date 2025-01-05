@@ -1,0 +1,3 @@
+./cmd/server/server
+./cmd/agent/agent
+./metrics_file.txt
