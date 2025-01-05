@@ -22,7 +22,7 @@ tasks:
     vars:
       SERVER_PORT: 8080
       TEMP_FILE: metrics_file.txt
-      ITER: 12
+      ITER: 13
     cmds:
       - |
         SERVER_PORT={{.SERVER_PORT}}
@@ -38,3 +38,6 @@ tasks:
     desc: 'add metrictest to PATH'
     cmds:
       - 'export PATH=$PATH:/Users/timur/golang/praktikum'
+  clear:
+    desc: 'remove build files and metric storage file'
+    cmd: 'rm ./cmd/agent/agent ./cmd/server/server ./metrics_file.txt'

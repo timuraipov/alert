@@ -4,30 +4,95 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
+	"time"
 
+	"github.com/jackc/pgerrcode"
+	"github.com/jackc/pgx/v5/pgconn"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/timuraipov/alert/internal/domain/metric"
+	"github.com/timuraipov/alert/internal/logger"
 	"github.com/timuraipov/alert/internal/storage"
+	"go.uber.org/zap"
 )
+
+const retryCount = 3
+
+var retryInterval = []int{1, 3, 5}
 
 type DB struct {
 	conn *sql.DB
+	dsn  string
 }
 
-func New(dsn string) *DB {
-
-	db, err := sql.Open("pgx", dsn)
+func (db *DB) getConnection() error {
+	err := db.conn.Ping()
+	var pgErr *pgconn.PgError
 	if err != nil {
-		panic(err)
+		if errors.As(err, &pgErr) && pgerrcode.IsConnectionException(pgErr.Code) {
+			newConn, err := connectionWithRetry(db.dsn)
+			db.conn = newConn
+			return err
+		} else {
+			return err
+		}
 	}
-	return &DB{
-		conn: db,
+	return nil
+}
+func New(dsn string) (*DB, error) {
+	op := "storage.postgres.new"
+	db, err := connectionWithRetry(dsn)
+	if err != nil {
+		logger.Log.Error("trouble with connection",
+			zap.String("operation", op),
+			zap.Error(err),
+		)
+		return &DB{}, err
 	}
+	return &DB{conn: db, dsn: dsn}, err
+}
+func connectionWithRetry(dsn string) (*sql.DB, error) {
+	op := "storage.postgres.connectionWithRetry"
+	var (
+		db  *sql.DB
+		err error
+	)
+	var pgErr *pgconn.PgError
+	db, err = sql.Open("pgx", dsn)
+	if err == nil {
+		return db, err
+	}
+	for i := 0; i < retryCount; i++ {
+		logger.Log.Error("database connect problem",
+			zap.String("operation", op),
+			zap.String("trying to reconnect db:", fmt.Sprintf("tries number- %d", i+1)),
+			zap.Error(err),
+		)
+		time.Sleep(time.Duration(retryInterval[i]) * time.Second)
+		db, err = sql.Open("pgx", dsn)
+		if err != nil {
+			if !errors.As(err, &pgErr) && pgerrcode.IsConnectionException(pgErr.Code) {
+				return nil, err
+			}
+		} else {
+			return db, nil
+		}
+
+	}
+	return nil, err
 }
 func (db *DB) Ping(ctx context.Context) error {
+	err := db.getConnection()
+	if err != nil {
+		return err
+	}
 	return db.conn.PingContext(ctx)
 }
 func (db *DB) Bootstrap(ctx context.Context) error {
+	err := db.getConnection()
+	if err != nil {
+		return err
+	}
 	tx, err := db.conn.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -54,6 +119,10 @@ func (db *DB) Bootstrap(ctx context.Context) error {
 }
 
 func (db *DB) Save(ctx context.Context, m metric.Metrics) (metric.Metrics, error) {
+	err := db.getConnection()
+	if err != nil {
+		return metric.Metrics{}, err
+	}
 	tx, err := db.conn.BeginTx(ctx, nil)
 	if err != nil {
 		return metric.Metrics{}, err
@@ -103,6 +172,10 @@ func (db *DB) Save(ctx context.Context, m metric.Metrics) (metric.Metrics, error
 	return m, err
 }
 func (db *DB) GetAll(ctx context.Context) ([]metric.Metrics, error) {
+	err := db.getConnection()
+	if err != nil {
+		return nil, err
+	}
 	rows, err := db.conn.QueryContext(ctx, `
 		select name, type, delta, value from metrics;
 	`)
@@ -125,11 +198,15 @@ func (db *DB) GetAll(ctx context.Context) ([]metric.Metrics, error) {
 	return metrics, nil
 }
 func (db *DB) GetByTypeAndName(ctx context.Context, metricType, metricName string) (metric.Metrics, error) {
+	err := db.getConnection()
+	if err != nil {
+		return metric.Metrics{}, err
+	}
 	row := db.conn.QueryRowContext(ctx, `
 		select name, type, delta, value from metrics where name = $1 and type = $2
 	`, metricName, metricType)
 	var m metric.Metrics
-	err := row.Scan(&m.ID, &m.MType, &m.Delta, &m.Value)
+	err = row.Scan(&m.ID, &m.MType, &m.Delta, &m.Value)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return metric.Metrics{}, storage.ErrMetricNotFound
@@ -143,6 +220,10 @@ func (db *DB) Flush() error {
 	return nil
 }
 func (db *DB) SaveBatch(ctx context.Context, metrics []metric.Metrics) error {
+	err := db.getConnection()
+	if err != nil {
+		return err
+	}
 	tx, err := db.conn.BeginTx(ctx, nil)
 	if err != nil {
 		return err

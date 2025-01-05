@@ -17,10 +17,10 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	err = logger.Initialize(cfg.FlagLogLevel)
-	if err != nil {
-		log.Print("problem with logger", err)
+	if err := logger.Initialize(cfg.FlagLogLevel); err != nil {
+		panic(err)
 	}
+
 	logger.Log.Info("Starting to collect agent data",
 		zap.String("operation", op),
 	)

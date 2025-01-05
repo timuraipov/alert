@@ -27,6 +27,10 @@ type MetricsCollector struct {
 	PollCount           int64
 }
 
+const retryCount = 3
+
+var retryInterval = []int{1, 3, 5}
+
 func New(flagRunAddr string, reportInterval, pollInterval int64) *MetricsCollector {
 	return &MetricsCollector{
 		GaugeMetrics:        map[string]interface{}{},
@@ -109,25 +113,45 @@ func (m *MetricsCollector) Send(url string) error {
 	}
 
 	metrics = append(metrics, metric)
-	err := m.sendMetric(url, metrics)
+	statusCode, err := m.sendMetric(url, metrics)
+	if statusCode == http.StatusRequestTimeout || statusCode >= http.StatusInternalServerError {
+		logger.Log.Error("can't save metrics",
+			zap.String("operation", op),
+			zap.String("trying to resend metrics:", "start to retry"),
+			zap.Error(err),
+		)
+		for i := 0; i < retryCount; i++ {
+			time.Sleep(time.Duration(retryInterval[i]) * time.Second)
+			statusCode, err = m.sendMetric(url, metrics)
+			if !(err != nil || statusCode == http.StatusRequestTimeout || statusCode >= http.StatusInternalServerError) {
+				break
+			}
+			logger.Log.Error("can't save metrics",
+				zap.String("operation", op),
+				zap.String("trying to resend metrics:", fmt.Sprintf("tries number- %d", i+1)),
+				zap.Error(err),
+			)
+		}
+	}
 	if err != nil {
 		return err
 	}
 	m.PollCount = 0
 	return nil
 }
-func (m *MetricsCollector) sendMetric(url string, metricObj []metric.Metrics) error {
+func (m *MetricsCollector) sendMetric(url string, metricObj []metric.Metrics) (int, error) {
 	requestBody, err := json.Marshal(metricObj)
 	if err != nil {
 		log.Print(err)
 	}
 	res, err := http.Post(url, `application/json`, bytes.NewReader(requestBody))
+
 	if err != nil {
-		return err
+		return http.StatusInternalServerError, err
 	} else {
 		res.Body.Close()
 	}
-	return nil
+	return res.StatusCode, nil
 }
 func (m *MetricsCollector) Run() {
 	op := "agent.Run"

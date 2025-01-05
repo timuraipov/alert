@@ -29,13 +29,20 @@ type Server struct {
 }
 
 func New(cfg *config.Config) *Server {
+	op := "server.New"
 	var (
 		metricsHandler *metrics.MetricHandler
 		healthHandler  *health.Health
 	)
 	ctx := context.Background()
 	if len(cfg.DatabaseDSN) > 0 {
-		postgresStorage := postgres.New(cfg.DatabaseDSN)
+		postgresStorage, err := postgres.New(cfg.DatabaseDSN)
+		if err != nil {
+			logger.Log.Error("storage connection error",
+				zap.String("operation", op),
+				zap.Error(err),
+			)
+		}
 		if err := postgresStorage.Bootstrap(ctx); err != nil {
 			logger.Log.Fatal("error while bootstrap table", zap.Error(err))
 		}
