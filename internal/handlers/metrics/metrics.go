@@ -255,6 +255,7 @@ func (mh *MetricHandler) UpdateJSONBatch(w http.ResponseWriter, r *http.Request)
 	var myMetrics []metric.Metrics
 	var buf bytes.Buffer
 	_, err := buf.ReadFrom(r.Body)
+	logger.Log.Info("headers", zap.Any("headers", r.Header))
 	if err != nil {
 		logger.Log.Error("failed to read incoming message",
 			zap.String("operation", op),

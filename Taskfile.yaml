@@ -22,7 +22,7 @@ tasks:
     vars:
       SERVER_PORT: 8080
       TEMP_FILE: metrics_file.txt
-      ITER: 13
+      ITER: 14
     cmds:
       - |
         SERVER_PORT={{.SERVER_PORT}}
@@ -32,6 +32,7 @@ tasks:
         -agent-binary-path=cmd/agent/agent \
         -binary-path=cmd/server/server \
         -database-dsn="postgres://metric:XXXXX@localhost:5432/metric?sslmode=disable" \
+        -key="${TEMP_FILE}" \
         -server-port=$SERVER_PORT \
         -source-path=.
   set-export-path:

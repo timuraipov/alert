@@ -13,31 +13,31 @@ import (
 	"sync"
 	"time"
 
+	"github.com/timuraipov/alert/internal/agent/config"
 	"github.com/timuraipov/alert/internal/domain/metric"
 	"github.com/timuraipov/alert/internal/logger"
+	"github.com/timuraipov/alert/internal/pkg/hmac"
 	"go.uber.org/zap"
 )
 
+const SignatureHeaderName = "HashSHA256"
+
 type MetricsCollector struct {
-	mx                  sync.Mutex
-	GaugeMetrics        map[string]interface{}
-	PollInterval        int64
-	ReportCountInterval int64
-	Addr                string
-	PollCount           int64
+	mx           sync.Mutex
+	GaugeMetrics map[string]interface{}
+	PollCount    int64
+	cfg          *config.Config
 }
 
 const retryCount = 3
 
 var retryInterval = []int{1, 3, 5}
 
-func New(flagRunAddr string, reportInterval, pollInterval int64) *MetricsCollector {
+func New(cfg *config.Config) *MetricsCollector {
 	return &MetricsCollector{
-		GaugeMetrics:        map[string]interface{}{},
-		PollInterval:        pollInterval,
-		ReportCountInterval: reportInterval,
-		Addr:                flagRunAddr,
-		PollCount:           0,
+		GaugeMetrics: map[string]interface{}{},
+		PollCount:    0,
+		cfg:          cfg,
 	}
 }
 func (m *MetricsCollector) UpdateMetrics() {
@@ -144,8 +144,18 @@ func (m *MetricsCollector) sendMetric(url string, metricObj []metric.Metrics) (i
 	if err != nil {
 		log.Print(err)
 	}
-	res, err := http.Post(url, `application/json`, bytes.NewReader(requestBody))
 
+	//res, err := http.Post(url, `application/json`, bytes.NewReader(requestBody))
+	client := &http.Client{}
+	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(requestBody))
+	if err != nil {
+		log.Print(err)
+	}
+	if len(m.cfg.SignBodyKey) > 0 {
+		header := hmac.SignData(requestBody, m.cfg.SignBodyKey)
+		req.Header.Add(SignatureHeaderName, header)
+	}
+	res, err := client.Do(req)
 	if err != nil {
 		return http.StatusInternalServerError, err
 	} else {
@@ -155,7 +165,7 @@ func (m *MetricsCollector) sendMetric(url string, metricObj []metric.Metrics) (i
 }
 func (m *MetricsCollector) Run() {
 	op := "agent.Run"
-	tickerUpdateMetrics := time.NewTicker(time.Duration(m.PollInterval) * time.Second)
+	tickerUpdateMetrics := time.NewTicker(time.Duration(m.cfg.PollInterval) * time.Second)
 	quitUpdateMetrics := make(chan struct{})
 	go func() {
 		for {
@@ -168,9 +178,9 @@ func (m *MetricsCollector) Run() {
 			}
 		}
 	}()
-	time.Sleep(time.Duration(m.ReportCountInterval) * time.Second)
+	time.Sleep(time.Duration(m.cfg.ReportInterval) * time.Second)
 	for {
-		err := m.Send("http://" + m.Addr + "/updates/")
+		err := m.Send("http://" + m.cfg.ServerAddr + "/updates/")
 		if err != nil {
 			logger.Log.Error("failed to Marshal body",
 				zap.String("operation", op),
@@ -178,7 +188,7 @@ func (m *MetricsCollector) Run() {
 			)
 			log.Print(err)
 		}
-		time.Sleep(time.Duration(m.ReportCountInterval) * time.Second)
+		time.Sleep(time.Duration(m.cfg.ReportInterval) * time.Second)
 	}
 
 }

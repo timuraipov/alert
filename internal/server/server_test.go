@@ -448,5 +448,5 @@ func getServer() (*httptest.Server, *metrics.MetricHandler) {
 		panic(err)
 	}
 	metricsHandler := metrics.New(storage)
-	return httptest.NewServer(MetricsRouter(metricsHandler)), metricsHandler
+	return httptest.NewServer(MetricsRouter(metricsHandler, "")), metricsHandler
 }

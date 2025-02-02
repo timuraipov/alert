@@ -25,6 +25,6 @@ func main() {
 		zap.String("operation", op),
 	)
 
-	agent := agent.New(cfg.ServerAddr, cfg.ReportInterval, cfg.PollInterval)
+	agent := agent.New(cfg)
 	agent.Run()
 }

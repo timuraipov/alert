@@ -14,6 +14,7 @@ type Config struct {
 	FileStoragePath string `env:"FILE_STORAGE_PATH"`
 	Restore         bool   `env:"RESTORE"`
 	DatabaseDSN     string `env:"DATABASE_DSN"`
+	SignBodyKey     string `env:"KEY"`
 }
 
 func MustLoad() (*Config, error) {
@@ -24,6 +25,7 @@ func MustLoad() (*Config, error) {
 	flag.StringVar(&cfg.FileStoragePath, "f", "metrics_file.txt", "file name for flush to disk")
 	flag.BoolVar(&cfg.Restore, "r", true, "flag to indicate if need to load metrics from file")
 	flag.StringVar(&cfg.DatabaseDSN, "d", "", "database connection URL")
+	flag.StringVar(&cfg.SignBodyKey, "k", "", "setup flagLogLevel")
 	//fmt.Sprintf("host=%s user=%s password=%s dbname=%s sslmode=disable",
 	//	`localhost`, `metric`, `XXXXX`, `metric`)
 	flag.Parse()

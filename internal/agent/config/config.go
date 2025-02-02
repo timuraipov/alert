@@ -11,6 +11,7 @@ type Config struct {
 	ReportInterval int64  `env:"REPORT_INTERVAL"`
 	PollInterval   int64  `env:"POLL_INTERVAL"`
 	FlagLogLevel   string `env:"LOG_LEVEL"`
+	SignBodyKey    string `env:"KEY"`
 }
 
 func MustLoad() (*Config, error) {
@@ -19,6 +20,7 @@ func MustLoad() (*Config, error) {
 	flag.Int64Var(&cfg.ReportInterval, "r", 10, "reportInterval period")
 	flag.Int64Var(&cfg.PollInterval, "p", 2, "pollInterval period")
 	flag.StringVar(&cfg.FlagLogLevel, "l", "info", "setup flagLogLevel")
+	flag.StringVar(&cfg.SignBodyKey, "k", "", "setup flagLogLevel")
 	flag.Parse()
 	err := env.Parse(cfg)
 

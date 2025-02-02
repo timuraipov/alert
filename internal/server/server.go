@@ -17,6 +17,7 @@ import (
 	"github.com/timuraipov/alert/internal/logger"
 	"github.com/timuraipov/alert/internal/middleware/gzip"
 	middlewareLogger "github.com/timuraipov/alert/internal/middleware/logger"
+	"github.com/timuraipov/alert/internal/middleware/signer"
 	"github.com/timuraipov/alert/internal/storage/inmemory"
 	"github.com/timuraipov/alert/internal/storage/postgres"
 	"go.uber.org/zap"
@@ -56,20 +57,34 @@ func New(cfg *config.Config) *Server {
 		healthHandler = health.New(storage)
 	}
 
-	r := MetricsRouter(metricsHandler)
+	r := MetricsRouter(metricsHandler, cfg.SignBodyKey)
 	r.Get("/ping", healthHandler.Ping)
 	return &Server{r: r, metricsHandler: metricsHandler, cfg: cfg}
 }
-func MetricsRouter(handler *metrics.MetricHandler) chi.Router {
+func MetricsRouter(handler *metrics.MetricHandler, signerKey string) chi.Router {
 	r := chi.NewRouter()
 	r.Use(middlewareLogger.WithLogging)
 	r.Use(gzip.GzipMiddleware)
-	r.Post("/update/", handler.UpdateJSON)
-	r.Post("/update/{type}/{name}/{val}", handler.Update)
-	r.Post("/value/", handler.GetByNameJSON)
-	r.Post("/updates/", handler.UpdateJSONBatch)
-	r.Get("/value/{type}/{name}", handler.GetByName)
-	r.Get("/", handler.GetAll)
+
+	if len(signerKey) > 0 {
+		signer := signer.NewSigner(signerKey)
+
+		r.With(signer.WithCheckSignature, signer.WithSignResponse).Post("/update/", handler.UpdateJSON)
+		r.With(signer.WithCheckSignature, signer.WithSignResponse).Post("/updates/", handler.UpdateJSONBatch)
+
+		r.With(signer.WithCheckSignature, signer.WithSignResponse).Post("/value/", handler.GetByNameJSON)
+		r.Post("/update/{type}/{name}/{val}", handler.Update)
+		r.With(signer.WithSignResponse).Get("/value/{type}/{name}", handler.GetByName)
+		r.With(signer.WithSignResponse).Get("/", handler.GetAll)
+	} else {
+		r.Post("/update/", handler.UpdateJSON)
+		r.Post("/update/{type}/{name}/{val}", handler.Update)
+		r.Post("/value/", handler.GetByNameJSON)
+		r.Post("/updates/", handler.UpdateJSONBatch)
+		r.Get("/value/{type}/{name}", handler.GetByName)
+		r.Get("/", handler.GetAll)
+	}
+
 	return r
 }
 func (s *Server) ListenAndServe() error {
