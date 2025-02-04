@@ -12,6 +12,7 @@ type Config struct {
 	PollInterval   int64  `env:"POLL_INTERVAL"`
 	FlagLogLevel   string `env:"LOG_LEVEL"`
 	SignBodyKey    string `env:"KEY"`
+	RateLimit      int    `env:"RATE_LIMIT"`
 }
 
 func MustLoad() (*Config, error) {
@@ -19,8 +20,9 @@ func MustLoad() (*Config, error) {
 	flag.StringVar(&cfg.ServerAddr, "a", "localhost:8080", "address and port to request server")
 	flag.Int64Var(&cfg.ReportInterval, "r", 10, "reportInterval period")
 	flag.Int64Var(&cfg.PollInterval, "p", 2, "pollInterval period")
-	flag.StringVar(&cfg.FlagLogLevel, "l", "info", "setup flagLogLevel")
+	//flag.StringVar(&cfg.FlagLogLevel, "l", "info", "setup flagLogLevel")
 	flag.StringVar(&cfg.SignBodyKey, "k", "", "setup flagLogLevel")
+	flag.IntVar(&cfg.RateLimit, "l", 0, "need to work with worker pool mode")
 	flag.Parse()
 	err := env.Parse(cfg)
 

@@ -10,9 +10,12 @@ import (
 	"math/rand/v2"
 	"net/http"
 	"runtime"
+	"strconv"
 	"sync"
 	"time"
 
+	"github.com/shirou/gopsutil/v4/cpu"
+	"github.com/shirou/gopsutil/v4/mem"
 	"github.com/timuraipov/alert/internal/agent/config"
 	"github.com/timuraipov/alert/internal/domain/metric"
 	"github.com/timuraipov/alert/internal/logger"
@@ -21,12 +24,14 @@ import (
 )
 
 const SignatureHeaderName = "HashSHA256"
+const NumJobs = 5
 
 type MetricsCollector struct {
 	mx           sync.Mutex
 	GaugeMetrics map[string]interface{}
 	PollCount    int64
 	cfg          *config.Config
+	jobs         chan metric.Metrics
 }
 
 const retryCount = 3
@@ -75,8 +80,20 @@ func (m *MetricsCollector) UpdateMetrics() {
 	m.GaugeMetrics["TotalAlloc"] = memStat.TotalAlloc
 	m.GaugeMetrics["RandomValue"] = rand.Float64()
 }
-func (m *MetricsCollector) Send(url string) error {
-	op := "agent.Send"
+func (m *MetricsCollector) AdditionalMetrics() {
+	v, _ := mem.VirtualMemory()
+	cpu, _ := cpu.Percent(time.Second, true)
+	m.mx.Lock()
+	defer m.mx.Unlock()
+	m.GaugeMetrics["TotalMemory"] = v.Total
+	m.GaugeMetrics["FreeMemory"] = v.Free
+	for i, unit := range cpu {
+		key := "CPUutilization" + strconv.Itoa(i)
+		m.GaugeMetrics[key] = unit
+	}
+}
+func (m *MetricsCollector) GetData() []metric.Metrics {
+	op := "agent.GetData"
 	m.mx.Lock()
 	defer m.mx.Unlock()
 	var metrics []metric.Metrics
@@ -95,57 +112,47 @@ func (m *MetricsCollector) Send(url string) error {
 			Value: &typedValue,
 		}
 		metrics = append(metrics, metric)
-		// err = m.sendMetric(url, metric)
-		// if err != nil {
-		// 	logger.Log.Error("failed to  send metrics",
-		// 		zap.String("operation", op),
-		// 		zap.Error(err),
-		// 	)
-		// 	return err
-		// }
 	}
-	//send PollCount
-
+	value := new(int64)
+	*value = m.PollCount
 	metric := metric.Metrics{
 		ID:    "PollCount",
 		MType: metric.MetricTypeCounter,
-		Delta: &m.PollCount,
+		Delta: value,
 	}
 
 	metrics = append(metrics, metric)
-	statusCode, err := m.sendMetric(url, metrics)
-	if statusCode == http.StatusRequestTimeout || statusCode >= http.StatusInternalServerError {
-		logger.Log.Error("can't save metrics",
-			zap.String("operation", op),
-			zap.String("trying to resend metrics:", "start to retry"),
-			zap.Error(err),
-		)
-		for i := 0; i < retryCount; i++ {
-			time.Sleep(time.Duration(retryInterval[i]) * time.Second)
-			statusCode, err = m.sendMetric(url, metrics)
-			if !(err != nil || statusCode == http.StatusRequestTimeout || statusCode >= http.StatusInternalServerError) {
-				break
+	return metrics
+}
+func (m *MetricsCollector) Send(url string) error {
+	op := "agent.Send"
+	_ = op
+	metrics := m.GetData()
+	if m.cfg.RateLimit > 0 {
+		go func() {
+			for _, metric := range metrics {
+				m.jobs <- metric
 			}
-			logger.Log.Error("can't save metrics",
-				zap.String("operation", op),
-				zap.String("trying to resend metrics:", fmt.Sprintf("tries number- %d", i+1)),
-				zap.Error(err),
-			)
+		}()
+	} else {
+		_, err := m.sendMetric(url, metrics)
+
+		if err != nil {
+			return err
 		}
 	}
-	if err != nil {
-		return err
-	}
+	m.mx.Lock()
 	m.PollCount = 0
+	m.mx.Unlock()
 	return nil
 }
 func (m *MetricsCollector) sendMetric(url string, metricObj []metric.Metrics) (int, error) {
+	op := "agent.SendMetric"
 	requestBody, err := json.Marshal(metricObj)
 	if err != nil {
 		log.Print(err)
 	}
 
-	//res, err := http.Post(url, `application/json`, bytes.NewReader(requestBody))
 	client := &http.Client{}
 	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(requestBody))
 	if err != nil {
@@ -155,23 +162,40 @@ func (m *MetricsCollector) sendMetric(url string, metricObj []metric.Metrics) (i
 		header := hmac.SignData(requestBody, m.cfg.SignBodyKey)
 		req.Header.Add(SignatureHeaderName, header)
 	}
-	res, err := client.Do(req)
-	if err != nil {
-		return http.StatusInternalServerError, err
-	} else {
-		res.Body.Close()
+	for i := 0; i < retryCount; i++ {
+		res, err := client.Do(req)
+
+		if err == nil {
+			res.Body.Close()
+			return res.StatusCode, nil
+		}
+
+		logger.Log.Error("can't sent metrics",
+			zap.String("operation", op),
+			zap.String("trying to resend metrics:", fmt.Sprintf("tries number- %d", i+1)),
+			zap.Error(err),
+		)
+		time.Sleep(time.Duration(retryInterval[i]) * time.Second)
 	}
-	return res.StatusCode, nil
+	return http.StatusInternalServerError, nil
 }
 func (m *MetricsCollector) Run() {
 	op := "agent.Run"
+	url := "http://" + m.cfg.ServerAddr + "/updates/"
 	tickerUpdateMetrics := time.NewTicker(time.Duration(m.cfg.PollInterval) * time.Second)
 	quitUpdateMetrics := make(chan struct{})
+	if m.cfg.RateLimit > 0 {
+		m.jobs = make(chan metric.Metrics, NumJobs)
+		for w := 1; w <= m.cfg.RateLimit; w++ {
+			go m.worker(w, url)
+		}
+	}
 	go func() {
 		for {
 			select {
 			case <-tickerUpdateMetrics.C:
 				m.UpdateMetrics()
+				go m.AdditionalMetrics()
 			case <-quitUpdateMetrics:
 				tickerUpdateMetrics.Stop()
 				return
@@ -180,7 +204,7 @@ func (m *MetricsCollector) Run() {
 	}()
 	time.Sleep(time.Duration(m.cfg.ReportInterval) * time.Second)
 	for {
-		err := m.Send("http://" + m.cfg.ServerAddr + "/updates/")
+		err := m.Send(url)
 		if err != nil {
 			logger.Log.Error("failed to Marshal body",
 				zap.String("operation", op),
@@ -189,6 +213,21 @@ func (m *MetricsCollector) Run() {
 			log.Print(err)
 		}
 		time.Sleep(time.Duration(m.cfg.ReportInterval) * time.Second)
+	}
+
+}
+func (m *MetricsCollector) worker(id int, url string) {
+	op := "agent.Worker"
+	//todo some work
+	for job := range m.jobs {
+		logger.Log.Info(fmt.Sprintf("worker with id %d", id))
+		_, err := m.sendMetric(url, []metric.Metrics{job})
+		if err != nil {
+			logger.Log.Error("failed to Marshal body",
+				zap.String("operation", op),
+				zap.Error(err),
+			)
+		}
 	}
 
 }
