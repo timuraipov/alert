@@ -23,8 +23,10 @@ import (
 	"go.uber.org/zap"
 )
 
-const SignatureHeaderName = "HashSHA256"
-const NumJobs = 5
+const (
+	SignatureHeaderName = "HashSHA256"
+	NumJobs             = 5
+)
 
 type MetricsCollector struct {
 	mx           sync.Mutex
@@ -45,6 +47,7 @@ func New(cfg *config.Config) *MetricsCollector {
 		cfg:          cfg,
 	}
 }
+
 func (m *MetricsCollector) UpdateMetrics() {
 	var memStat runtime.MemStats
 	runtime.ReadMemStats(&memStat)
@@ -80,6 +83,7 @@ func (m *MetricsCollector) UpdateMetrics() {
 	m.GaugeMetrics["TotalAlloc"] = memStat.TotalAlloc
 	m.GaugeMetrics["RandomValue"] = rand.Float64()
 }
+
 func (m *MetricsCollector) AdditionalMetrics() {
 	v, _ := mem.VirtualMemory()
 	cpu, _ := cpu.Percent(time.Second, true)
@@ -92,6 +96,7 @@ func (m *MetricsCollector) AdditionalMetrics() {
 		m.GaugeMetrics[key] = unit
 	}
 }
+
 func (m *MetricsCollector) GetData() []metric.Metrics {
 	op := "agent.GetData"
 	m.mx.Lock()
@@ -124,6 +129,7 @@ func (m *MetricsCollector) GetData() []metric.Metrics {
 	metrics = append(metrics, metric)
 	return metrics
 }
+
 func (m *MetricsCollector) Send(url string) error {
 	op := "agent.Send"
 	_ = op
@@ -136,7 +142,6 @@ func (m *MetricsCollector) Send(url string) error {
 		}()
 	} else {
 		_, err := m.sendMetric(url, metrics)
-
 		if err != nil {
 			return err
 		}
@@ -146,6 +151,7 @@ func (m *MetricsCollector) Send(url string) error {
 	m.mx.Unlock()
 	return nil
 }
+
 func (m *MetricsCollector) sendMetric(url string, metricObj []metric.Metrics) (int, error) {
 	op := "agent.SendMetric"
 	requestBody, err := json.Marshal(metricObj)
@@ -179,6 +185,7 @@ func (m *MetricsCollector) sendMetric(url string, metricObj []metric.Metrics) (i
 	}
 	return http.StatusInternalServerError, nil
 }
+
 func (m *MetricsCollector) Run() {
 	op := "agent.Run"
 	url := "http://" + m.cfg.ServerAddr + "/updates/"
@@ -214,11 +221,11 @@ func (m *MetricsCollector) Run() {
 		}
 		time.Sleep(time.Duration(m.cfg.ReportInterval) * time.Second)
 	}
-
 }
+
 func (m *MetricsCollector) worker(id int, url string) {
 	op := "agent.Worker"
-	//todo some work
+	// todo some work
 	for job := range m.jobs {
 		logger.Log.Info(fmt.Sprintf("worker with id %d", id))
 		_, err := m.sendMetric(url, []metric.Metrics{job})
@@ -229,8 +236,8 @@ func (m *MetricsCollector) worker(id int, url string) {
 			)
 		}
 	}
-
 }
+
 func convertToFloat64(value interface{}) (float64, error) {
 	switch i := value.(type) {
 	case float64:

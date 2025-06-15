@@ -25,6 +25,7 @@ func New(storage storage.DBStorage) *MetricHandler {
 	}
 	return metricsHandler
 }
+
 func (mh *MetricHandler) Shutdown() error {
 	return mh.Storage.Flush()
 }
@@ -57,12 +58,12 @@ func (mh *MetricHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 
 	w.Write([]byte(responseData))
 }
+
 func (mh *MetricHandler) GetByNameJSON(w http.ResponseWriter, r *http.Request) {
 	op := "handlers.metrics.GetByName"
 	var metrics metric.Metrics
 	var buf bytes.Buffer
 	_, err := buf.ReadFrom(r.Body)
-
 	if err != nil {
 		logger.Log.Error("failed to read incoming message",
 			zap.String("operation", op),
@@ -73,7 +74,7 @@ func (mh *MetricHandler) GetByNameJSON(w http.ResponseWriter, r *http.Request) {
 		zap.String("operation", op),
 		zap.String("requestBody", buf.String()),
 	)
-	tmp := buf.Bytes() //TODO return back
+	tmp := buf.Bytes() // TODO return back
 	if err := json.Unmarshal(tmp, &metrics); err != nil {
 		logger.Log.Error("failed to Unmarshal body",
 			zap.String("operation", op),
@@ -106,6 +107,7 @@ func (mh *MetricHandler) GetByNameJSON(w http.ResponseWriter, r *http.Request) {
 		w.Write(responseBody)
 	}
 }
+
 func (mh *MetricHandler) GetByName(w http.ResponseWriter, r *http.Request) {
 	name := chi.URLParam(r, "name")
 	metricType := chi.URLParam(r, "type")
@@ -127,7 +129,6 @@ func (mh *MetricHandler) GetByName(w http.ResponseWriter, r *http.Request) {
 		}
 
 	}
-
 }
 
 func (mh *MetricHandler) UpdateJSON(w http.ResponseWriter, r *http.Request) {
@@ -136,7 +137,6 @@ func (mh *MetricHandler) UpdateJSON(w http.ResponseWriter, r *http.Request) {
 	var buf bytes.Buffer
 	_, err := buf.ReadFrom(r.Body)
 	if err != nil {
-
 		logger.Log.Error("failed to read incoming message",
 			zap.String("operation", op),
 			zap.Error(err),
@@ -194,6 +194,7 @@ func parseAndValidateJSON(metrics metric.Metrics) error {
 
 	return nil
 }
+
 func (mh *MetricHandler) Update(w http.ResponseWriter, r *http.Request) {
 	op := "handlers.metrics.Update"
 	metricType := chi.URLParam(r, "type")
@@ -209,7 +210,6 @@ func (mh *MetricHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_, err = mh.Storage.Save(r.Context(), *metric)
-
 	if err != nil {
 		logger.Log.Error(" exception",
 			zap.String("operation", op),
@@ -249,6 +249,7 @@ func parseAndValidate(metricType, metricName string, value string) (*metric.Metr
 	metricObj.ID = metricName
 	return metricObj, nil
 }
+
 func (mh *MetricHandler) UpdateJSONBatch(w http.ResponseWriter, r *http.Request) {
 	op := "handlers.metrics.UpdateJSONBatch"
 	var myMetrics []metric.Metrics

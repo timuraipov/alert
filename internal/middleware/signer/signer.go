@@ -27,6 +27,7 @@ func (sw *SignerResponseWriter) Write(b []byte) (int, error) {
 	sw.body = append(sw.body, b...)
 	return sw.ResponseWriter.Write(b)
 }
+
 func (sw *SignerResponseWriter) WriteHeader(statusCode int) {
 	signature := hmac.SignData(sw.body, sw.key)
 	sw.Header().Set(SignatureHeaderName, signature)
@@ -37,14 +38,13 @@ func (sw *SignerResponseWriter) WriteHeader(statusCode int) {
 func NewSigner(key string) *Signer {
 	return &Signer{Key: key}
 }
+
 func (s *Signer) WithCheckSignature(h http.Handler) http.Handler {
 	checkSignFn := func(w http.ResponseWriter, r *http.Request) {
-
 		signature := r.Header.Get(SignatureHeaderName)
 		if len(signature) > 0 {
 			var buf bytes.Buffer
 			_, err := buf.ReadFrom(r.Body)
-
 			if err != nil {
 				w.WriteHeader(http.StatusInternalServerError)
 				return
@@ -66,6 +66,7 @@ func (s *Signer) WithCheckSignature(h http.Handler) http.Handler {
 	}
 	return http.HandlerFunc(checkSignFn)
 }
+
 func (s *Signer) WithSignResponse(h http.Handler) http.Handler {
 	signResponseFn := func(w http.ResponseWriter, r *http.Request) {
 		sw := &SignerResponseWriter{

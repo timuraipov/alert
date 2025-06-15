@@ -61,6 +61,7 @@ func New(cfg *config.Config) *Server {
 	r.Get("/ping", healthHandler.Ping)
 	return &Server{r: r, metricsHandler: metricsHandler, cfg: cfg}
 }
+
 func MetricsRouter(handler *metrics.MetricHandler, signerKey string) chi.Router {
 	r := chi.NewRouter()
 	r.Use(middlewareLogger.WithLogging)
@@ -87,8 +88,8 @@ func MetricsRouter(handler *metrics.MetricHandler, signerKey string) chi.Router 
 
 	return r
 }
-func (s *Server) ListenAndServe() error {
 
+func (s *Server) ListenAndServe() error {
 	server := &http.Server{Addr: s.cfg.FlagRunAddr, Handler: s.r}
 
 	serverCtx, serverStopCtx := context.WithCancel(context.Background())
@@ -111,7 +112,6 @@ func (s *Server) ListenAndServe() error {
 		err := s.metricsHandler.Shutdown()
 		if err != nil {
 			logger.Log.Error("failed to shutdown metrics", zap.Error(err))
-
 		}
 		// Trigger graceful shutdown
 		err = server.Shutdown(shutdownCtx)

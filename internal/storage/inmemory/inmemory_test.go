@@ -70,6 +70,7 @@ func BenchmarkSaveGauge(b *testing.B) {
 		}
 	}
 }
+
 func TestSaveGauge(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -260,8 +261,8 @@ func TestFileStorage(t *testing.T) {
 			assert.JSONEqf(t, fmt.Sprint(test.want), fmt.Sprint(string(jsonMetrics)), "error message %s", "formatted")
 		})
 	}
-
 }
+
 func Seed(storage *InMemory) {
 	seeds := []metric.Metrics{
 		{
@@ -294,6 +295,7 @@ func Seed(storage *InMemory) {
 		}
 	}
 }
+
 func TestGetAll(t *testing.T) {
 	tests := []struct {
 		name  string
@@ -362,7 +364,6 @@ func TestGetAll(t *testing.T) {
 						return true
 					}
 				}
-
 			}
 		}
 		return false
@@ -444,8 +445,8 @@ func TestGetByTypeAndName(t *testing.T) {
 		})
 	}
 }
-func getStorage(configMap *config.Config) (*InMemory, error) {
 
+func getStorage(configMap *config.Config) (*InMemory, error) {
 	cfg := &config.Config{
 		StoreInterval:   1000,
 		FileStoragePath: `mytestfile.txt`,

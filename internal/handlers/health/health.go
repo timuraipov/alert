@@ -15,6 +15,7 @@ type Health struct {
 func New(db storage.DBHealthStorage) *Health {
 	return &Health{DB: db}
 }
+
 func (h *Health) Ping(w http.ResponseWriter, r *http.Request) {
 	if err := h.DB.Ping(r.Context()); err != nil {
 		logger.Log.Error("db error", zap.Error(err))

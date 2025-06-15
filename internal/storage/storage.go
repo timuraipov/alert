@@ -7,9 +7,7 @@ import (
 	"github.com/timuraipov/alert/internal/domain/metric"
 )
 
-var (
-	ErrMetricNotFound = errors.New("metric not found")
-)
+var ErrMetricNotFound = errors.New("metric not found")
 
 type DBStorage interface {
 	Save(ctx context.Context, metric metric.Metrics) (metric.Metrics, error)

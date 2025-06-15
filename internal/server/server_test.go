@@ -77,8 +77,8 @@ func TestUpdate(t *testing.T) {
 		})
 	}
 }
-func TestUpdateJson(t *testing.T) {
 
+func TestUpdateJson(t *testing.T) {
 	testCases := []struct {
 		name         string
 		path         string
@@ -246,7 +246,6 @@ func TestAll(t *testing.T) {
 }
 
 func TestGetByTypeAndNameJson(t *testing.T) {
-
 	testCases := []struct {
 		name          string
 		path          string
@@ -295,6 +294,7 @@ func TestGetByTypeAndNameJson(t *testing.T) {
 		})
 	}
 }
+
 func TestUpdates(t *testing.T) {
 	testCase := []metric.Metrics{
 		{
@@ -339,11 +339,10 @@ func TestUpdates(t *testing.T) {
 			assert.NoError(t, err)
 			resp.Body.Close()
 			assert.Equal(t, tt.expectedCode, resp.StatusCode)
-
 		})
 	}
-
 }
+
 func TestGetByTypeAndNameGZIP(t *testing.T) {
 	requestBody := `{"id":"PollCount","type":"counter"}`
 	successBody := `{"id":"PollCount","type":"counter","delta":105}`
@@ -384,9 +383,9 @@ func TestGetByTypeAndNameGZIP(t *testing.T) {
 		require.NoError(t, err)
 
 		require.JSONEq(t, successBody, string(b))
-
 	})
 }
+
 func preSeed(storage storage.DBStorage) {
 	seeds := []metric.Metrics{
 		{
@@ -429,8 +428,8 @@ func testRequest(t *testing.T, ts *httptest.Server, method string, path string, 
 	require.NoError(t, err)
 	return resp, string(respBody)
 }
-func getServer() (*httptest.Server, *metrics.MetricHandler) {
 
+func getServer() (*httptest.Server, *metrics.MetricHandler) {
 	cfg := &config.Config{
 		StoreInterval:   1000,
 		FileStoragePath: `mytestfile.txt`,

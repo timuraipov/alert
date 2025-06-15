@@ -26,7 +26,7 @@ func MustLoad() (*Config, error) {
 	flag.BoolVar(&cfg.Restore, "r", true, "flag to indicate if need to load metrics from file")
 	flag.StringVar(&cfg.DatabaseDSN, "d", "", "database connection URL")
 	flag.StringVar(&cfg.SignBodyKey, "k", "", "setup flagLogLevel")
-	//fmt.Sprintf("host=%s user=%s password=%s dbname=%s sslmode=disable",
+	// fmt.Sprintf("host=%s user=%s password=%s dbname=%s sslmode=disable",
 	//	`localhost`, `metric`, `XXXXX`, `metric`)
 	flag.Parse()
 	err := env.Parse(cfg)

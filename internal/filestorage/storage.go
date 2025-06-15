@@ -14,11 +14,13 @@ type Storage struct {
 func NewStorage(filename string) *Storage {
 	return &Storage{fileName: filename}
 }
+
 func (s *Storage) Write(data []byte) error {
 	logger.Log.Debug("write data to disk", zap.String("data body", string(data)))
 
-	return os.WriteFile(s.fileName, data, 0666)
+	return os.WriteFile(s.fileName, data, 0o666)
 }
+
 func (s *Storage) Read() ([]byte, error) {
 	data, err := os.ReadFile(s.fileName)
 	return data, err

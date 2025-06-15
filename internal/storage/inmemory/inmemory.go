@@ -54,6 +54,7 @@ func (i *InMemory) init() error {
 	}
 	return nil
 }
+
 func (i *InMemory) Flush() error {
 	logger.Log.Debug(
 		"called flush to disk method", zap.String("op", "op"),
@@ -74,6 +75,7 @@ func (i *InMemory) Flush() error {
 	}
 	return nil
 }
+
 func (i *InMemory) load() error {
 	metrics := make([]metric.Metrics, 0)
 	data, err := i.fileStorage.Read()
@@ -100,6 +102,7 @@ func (i *InMemory) Save(ctx context.Context, metricObj metric.Metrics) (metric.M
 	}
 	return responseList[0], nil
 }
+
 func (i *InMemory) GetAll(ctx context.Context) ([]metric.Metrics, error) {
 	i.mx.RLock()
 	defer i.mx.RUnlock()
@@ -120,6 +123,7 @@ func (i *InMemory) GetAll(ctx context.Context) ([]metric.Metrics, error) {
 	}
 	return metrics, nil
 }
+
 func (i *InMemory) GetByTypeAndName(ctx context.Context, metricType, metricName string) (metric.Metrics, error) {
 	i.mx.RLock()
 	defer i.mx.RUnlock()
@@ -142,6 +146,7 @@ func (i *InMemory) GetByTypeAndName(ctx context.Context, metricType, metricName 
 	}
 	return metric.Metrics{}, storage.ErrMetricNotFound
 }
+
 func New(fileStorage *filestorage.Storage, cfg *config.Config) (*InMemory, error) {
 	dbGauge := make(map[string]float64)
 	dbCounter := make(map[string]int64)
@@ -157,6 +162,7 @@ func New(fileStorage *filestorage.Storage, cfg *config.Config) (*InMemory, error
 	}
 	return storage, nil
 }
+
 func (i *InMemory) SaveBatch(ctx context.Context, metrics []metric.Metrics) error {
 	_, err := i.save(metrics)
 	if err != nil {
@@ -197,6 +203,7 @@ func (i *InMemory) save(metricsList []metric.Metrics) ([]metric.Metrics, error) 
 	}
 	return resultList, nil
 }
+
 func (i *InMemory) Ping(ctx context.Context) error {
 	return nil
 }

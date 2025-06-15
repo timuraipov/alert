@@ -20,7 +20,7 @@ func MustLoad() (*Config, error) {
 	flag.StringVar(&cfg.ServerAddr, "a", "localhost:8080", "address and port to request server")
 	flag.Int64Var(&cfg.ReportInterval, "r", 10, "reportInterval period")
 	flag.Int64Var(&cfg.PollInterval, "p", 2, "pollInterval period")
-	//flag.StringVar(&cfg.FlagLogLevel, "l", "info", "setup flagLogLevel")
+	// flag.StringVar(&cfg.FlagLogLevel, "l", "info", "setup flagLogLevel")
 	flag.StringVar(&cfg.SignBodyKey, "k", "", "setup flagLogLevel")
 	flag.IntVar(&cfg.RateLimit, "l", 0, "need to work with worker pool mode")
 	flag.Parse()

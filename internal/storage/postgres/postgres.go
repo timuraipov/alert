@@ -39,6 +39,7 @@ func (db *DB) getConnection() error {
 	}
 	return nil
 }
+
 func New(dsn string) (*DB, error) {
 	op := "storage.postgres.new"
 	db, err := connectionWithRetry(dsn)
@@ -51,6 +52,7 @@ func New(dsn string) (*DB, error) {
 	}
 	return &DB{conn: db, dsn: dsn}, err
 }
+
 func connectionWithRetry(dsn string) (*sql.DB, error) {
 	op := "storage.postgres.connectionWithRetry"
 	var (
@@ -81,6 +83,7 @@ func connectionWithRetry(dsn string) (*sql.DB, error) {
 	}
 	return nil, err
 }
+
 func (db *DB) Ping(ctx context.Context) error {
 	err := db.getConnection()
 	if err != nil {
@@ -88,6 +91,7 @@ func (db *DB) Ping(ctx context.Context) error {
 	}
 	return db.conn.PingContext(ctx)
 }
+
 func (db *DB) Bootstrap(ctx context.Context) error {
 	err := db.getConnection()
 	if err != nil {
@@ -132,7 +136,6 @@ func (db *DB) Save(ctx context.Context, m metric.Metrics) (metric.Metrics, error
 	row := tx.QueryRowContext(ctx, `select name, type, delta, value from metrics where name=$1 and type=$2`, m.ID, m.MType)
 	var selectedM metric.Metrics
 	err = row.Scan(&selectedM.ID, &selectedM.MType, &selectedM.Delta, &selectedM.Value)
-
 	if err != nil {
 		if !errors.Is(err, sql.ErrNoRows) {
 			return metric.Metrics{}, err
@@ -171,6 +174,7 @@ func (db *DB) Save(ctx context.Context, m metric.Metrics) (metric.Metrics, error
 	}
 	return m, err
 }
+
 func (db *DB) GetAll(ctx context.Context) ([]metric.Metrics, error) {
 	err := db.getConnection()
 	if err != nil {
@@ -197,6 +201,7 @@ func (db *DB) GetAll(ctx context.Context) ([]metric.Metrics, error) {
 	}
 	return metrics, nil
 }
+
 func (db *DB) GetByTypeAndName(ctx context.Context, metricType, metricName string) (metric.Metrics, error) {
 	err := db.getConnection()
 	if err != nil {
@@ -219,6 +224,7 @@ func (db *DB) GetByTypeAndName(ctx context.Context, metricType, metricName strin
 func (db *DB) Flush() error {
 	return nil
 }
+
 func (db *DB) SaveBatch(ctx context.Context, metrics []metric.Metrics) error {
 	err := db.getConnection()
 	if err != nil {
@@ -278,7 +284,6 @@ func (db *DB) SaveBatch(ctx context.Context, metrics []metric.Metrics) error {
 			}
 
 		} else {
-
 			if m.MType == metric.MetricTypeGauge {
 				_, err = stmtUpdateGauge.ExecContext(ctx, m.Value, m.ID, m.MType)
 				if err != nil {
