@@ -20,7 +20,6 @@ import (
 )
 
 func BenchmarkSaveGauge(b *testing.B) {
-	const triesN = 10000000
 	tests := []struct {
 		name       string
 		err        error
@@ -65,7 +64,7 @@ func BenchmarkSaveGauge(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		for _, test := range tests {
 			for _, metric := range test.metrics {
-				_, err = saver.Save(context.Background(), metric)
+				_, _ = saver.Save(context.Background(), metric)
 			}
 		}
 	}
