@@ -7,7 +7,6 @@ on:
       - main
 
 jobs:
-
   branchtest:
     runs-on: ubuntu-latest
 
@@ -18,7 +17,7 @@ jobs:
 
   metricstest:
     runs-on: ubuntu-latest
-    container: golang:1.22
+    container: golang:1.24
     needs: branchtest
 
     services:
@@ -42,7 +41,7 @@ jobs:
         with:
           repository: Yandex-Practicum/go-autotests
           latest: true
-          fileName: "*"
+          fileName: '*'
           out-file-path: .tools
           token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -56,13 +55,12 @@ jobs:
         run: |
           go install golang.org/x/tools/cmd/goimports@latest
 
-
       - name: Build server binary
         run: |
           cd cmd/server
           go build -buildvcs=false -o server
 
-      - name: "Code increment #1"
+      - name: 'Code increment #1'
         if: |
           github.ref == 'refs/heads/main' ||
           github.head_ref == 'iter1' ||
@@ -88,7 +86,7 @@ jobs:
           cd cmd/agent
           go build -buildvcs=false  -o agent
 
-      - name: "Code increment #2"
+      - name: 'Code increment #2'
         if: |
           github.ref == 'refs/heads/main' ||
           github.head_ref == 'iter2' ||
@@ -109,7 +107,7 @@ jobs:
             -source-path=. \
             -agent-binary-path=cmd/agent/agent
 
-      - name: "Code increment #3"
+      - name: 'Code increment #3'
         if: |
           github.ref == 'refs/heads/main' ||
           github.head_ref == 'iter3' ||
@@ -130,7 +128,7 @@ jobs:
             -agent-binary-path=cmd/agent/agent \
             -binary-path=cmd/server/server
 
-      - name: "Code increment #4"
+      - name: 'Code increment #4'
         if: |
           github.ref == 'refs/heads/main' ||
           github.head_ref == 'iter4' ||
@@ -154,7 +152,7 @@ jobs:
             -server-port=$SERVER_PORT \
             -source-path=.
 
-      - name: "Code increment #5"
+      - name: 'Code increment #5'
         if: |
           github.ref == 'refs/heads/main' ||
           github.head_ref == 'iter5' ||
@@ -177,7 +175,7 @@ jobs:
             -server-port=$SERVER_PORT \
             -source-path=.
 
-      - name: "Code increment #6"
+      - name: 'Code increment #6'
         if: |
           github.ref == 'refs/heads/main' ||
           github.head_ref == 'iter6' ||
@@ -199,7 +197,7 @@ jobs:
             -server-port=$SERVER_PORT \
             -source-path=.
 
-      - name: "Code increment #7"
+      - name: 'Code increment #7'
         if: |
           github.ref == 'refs/heads/main' ||
           github.head_ref == 'iter7' ||
@@ -220,7 +218,7 @@ jobs:
             -server-port=$SERVER_PORT \
             -source-path=.
 
-      - name: "Code increment #8"
+      - name: 'Code increment #8'
         if: |
           github.ref == 'refs/heads/main' ||
           github.head_ref == 'iter8' ||
@@ -240,7 +238,7 @@ jobs:
             -server-port=$SERVER_PORT \
             -source-path=.
 
-      - name: "Code increment #9"
+      - name: 'Code increment #9'
         if: |
           github.ref == 'refs/heads/main' ||
           github.head_ref == 'iter9' ||
@@ -260,7 +258,7 @@ jobs:
             -server-port=$SERVER_PORT \
             -source-path=.
 
-      - name: "Code increment #10"
+      - name: 'Code increment #10'
         if: |
           github.ref == 'refs/heads/main' ||
           github.head_ref == 'iter10' ||
@@ -279,7 +277,7 @@ jobs:
             -server-port=$SERVER_PORT \
             -source-path=.
 
-      - name: "Code increment #11"
+      - name: 'Code increment #11'
         if: |
           github.ref == 'refs/heads/main' ||
           github.head_ref == 'iter11' ||
@@ -297,7 +295,7 @@ jobs:
             -server-port=$SERVER_PORT \
             -source-path=.
 
-      - name: "Code increment #12"
+      - name: 'Code increment #12'
         if: |
           github.ref == 'refs/heads/main' ||
           github.head_ref == 'iter12' ||
@@ -314,7 +312,7 @@ jobs:
             -server-port=$SERVER_PORT \
             -source-path=.
 
-      - name: "Code increment #13"
+      - name: 'Code increment #13'
         if: |
           github.ref == 'refs/heads/main' ||
           github.head_ref == 'iter13' ||
@@ -330,7 +328,7 @@ jobs:
             -server-port=$SERVER_PORT \
             -source-path=.
 
-      - name: "Code increment #14"
+      - name: 'Code increment #14'
         if: |
           github.ref == 'refs/heads/main' ||
           github.head_ref == 'iter14'
@@ -346,7 +344,7 @@ jobs:
             -server-port=$SERVER_PORT \
             -source-path=.
 
-      - name: "Code increment #14 (race detection)"
+      - name: 'Code increment #14 (race detection)'
         if: |
           github.ref == 'refs/heads/main' ||
           github.head_ref == 'iter14'
