@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"slices"
 	"strings"
@@ -18,6 +19,57 @@ import (
 	commonStorage "github.com/timuraipov/alert/internal/storage"
 )
 
+func BenchmarkSaveGauge(b *testing.B) {
+	const triesN = 10000000
+	tests := []struct {
+		name       string
+		err        error
+		metrics    []metric.Metrics
+		want       float64
+		metricType string
+	}{
+		{
+			name: "positive Gauge",
+			err:  nil,
+			metrics: []metric.Metrics{
+				{
+					MType: metric.MetricTypeGauge,
+					ID:    "someName",
+					Value: common.Pointer(1.009),
+				},
+			},
+			want: 1.009,
+		},
+		{
+			name: "positive multi Gauge",
+			err:  nil,
+			metrics: []metric.Metrics{
+				{
+					MType: metric.MetricTypeGauge,
+					ID:    "someName",
+					Value: common.Pointer(1.001),
+				},
+				{
+					MType: metric.MetricTypeGauge,
+					ID:    "someName",
+					Value: common.Pointer(12.009),
+				},
+			},
+			want: 12.009,
+		},
+	}
+	saver, err := getStorage(nil)
+	if err != nil {
+		log.Panic("can't get storage")
+	}
+	for i := 0; i < b.N; i++ {
+		for _, test := range tests {
+			for _, metric := range test.metrics {
+				_, err = saver.Save(context.Background(), metric)
+			}
+		}
+	}
+}
 func TestSaveGauge(t *testing.T) {
 	tests := []struct {
 		name       string

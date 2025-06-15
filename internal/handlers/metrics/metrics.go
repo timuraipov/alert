@@ -64,7 +64,6 @@ func (mh *MetricHandler) GetByNameJSON(w http.ResponseWriter, r *http.Request) {
 	_, err := buf.ReadFrom(r.Body)
 
 	if err != nil {
-
 		logger.Log.Error("failed to read incoming message",
 			zap.String("operation", op),
 			zap.Error(err),
@@ -83,7 +82,7 @@ func (mh *MetricHandler) GetByNameJSON(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	logger.Log.Info("/value/ body", zap.String("body", string(tmp)))
+	logger.Log.Info("/value/body", zap.String("body", string(tmp)))
 	val, err := mh.Storage.GetByTypeAndName(r.Context(), metrics.MType, metrics.ID)
 	if err != nil {
 		if errors.Is(err, storage.ErrMetricNotFound) {

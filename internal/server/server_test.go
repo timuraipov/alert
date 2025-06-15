@@ -35,12 +35,6 @@ func TestUpdate(t *testing.T) {
 			method:       http.MethodPost,
 			expectedCode: http.StatusOK,
 		},
-		// {
-		// 	name:         "negative method GET",
-		// 	path:         "/update/counter/PollCount/100",
-		// 	method:       http.MethodGet,
-		// 	expectedCode: http.StatusForbidden,
-		// },
 		{
 			name:         "positive Gauge",
 			path:         "/update/gauge/Alloc/100.1",

@@ -11,7 +11,7 @@ tasks:
   test:
     desc: 'run test ./...'
     cmds:
-      - 'go test ./... -count=1'
+      - 'go test ./... -count=1 -bench=.'
   build:
     desc: 'build agent & server'
     cmds:
@@ -22,7 +22,7 @@ tasks:
     vars:
       SERVER_PORT: 8080
       TEMP_FILE: metrics_file.txt
-      ITER: 14
+      ITER: 16
     cmds:
       - |
         SERVER_PORT={{.SERVER_PORT}}
